@@ -6,7 +6,7 @@
 - [ ] UAC 승인/취소/비관리자 계정 상황별 설정 보존 및 작업 해제
 - [ ] 휠 탐색 후 일반 Alt+Tab 마지막 키 해제 Commit, Ctrl+Alt+Tab 고정 모드 구분
 - [ ] 독립 업데이트 창의 지속 표시/토큰 가림/취소, GitHub 실제 다운로드 종단 간 검증
-- [ ] CI에서 입력206+UI80+Updater11+Startup11 = 308개 자동 검사
+- [x] [PR #8 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112)에서 입력206+UI80+Updater11+Startup11 = 308개 자동 검사 통과
 - [ ] Windows 10/11 x64에서 dotnet build 성공
 - [ ] updater 전용 11개 테스트 및 EXE/게임 실행 스크립트 동일 폴더 확인
 - [ ] 게임 관리자 권한 승격/권한 취소/기존 인스턴스 takeover 테스트

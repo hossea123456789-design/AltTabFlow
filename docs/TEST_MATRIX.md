@@ -2,14 +2,14 @@
 
 ## 검사 수
 
-| 검사 | CLI | 1.1.8 기대 수 | CI 자동화 | 실제 Windows 사용자 세션 |
+| 검사 | CLI | 1.1.10 기대 수 | CI 자동화 | 실제 Windows 사용자 세션 |
 |---|---|---:|---|---|
-| 기본 키 입력·그룹·고정 세션 | `--self-test` | **206** | ✅ [PR #6 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42792830910) 206/206 성공 | 별도 재검증 |
-| UI·줄바꿈·아이콘·접근성·휠/업데이트 창 | `--ui-self-test` | **80** | ✅ [PR #6 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42792830910) 71/71 성공 | 별도 재검증 |
+| 기본 키 입력·그룹·고정 세션 | `--self-test` | **206** | ✅ [PR #8 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 206/206 성공 | 별도 재검증 |
+| UI·줄바꿈·아이콘·접근성·휠/업데이트 창 | `--ui-self-test` | **80** | ✅ [PR #8 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 80/80 성공 | 별도 재검증 |
 | 실제 창 미리 표시/취소 | `--peek-self-test` | **10** | 무인 CI에서 보장 불가 | 필요 |
 | 우클릭 메뉴 생명주기 | `--menu-self-test` | **7** | 무인 CI에서 보장 불가 | 필요 |
 | 전경 권한·지연된 대상 | `--focus-self-test` | **18** | 무인 CI에서 보장 불가 | 필요; Peek 10개와 중복 |
-| **원본 창전환 고유 302 + 신규 UI 9** | | **311** | 기본+UI=286개 CI 목표 | 나머지 고유 25개 및 물리 입력 필요 |
+| **원본 창전환 고유 302 + 신규 UI 9** | | **311** | 기본+UI=286개 CI 통과 | 나머지 고유 25개 및 물리 입력 필요 |
 
 위 302개는 **업로드된 1.1.8 명세가 보고한 결과**이며 CI가 자동으로 302개를 재실행했다고 주장하지 않습니다. 정확한 통과 여부는 각 실행의 JSON `failures`, `tests[].passed`, 종료 코드와 Action 결론을 확인하세요.
 
@@ -74,3 +74,9 @@ dotnet build .\AltTabFlow.csproj -c Release
 ## 1.1.9 GitHub 자동 검사 결과
 
 [PR #7 Windows CI #42812687675](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42812687675): 기본 206/206, UI 71/71, 신규 업데이터 11/11 = 총 288개 자동 검사 통과. 실행 파일 생성, SHA-256 매니페스트 검증, 실제 Windows 화면 캡처, EXE+게임 호환 스크립트 동일 폴더 ZIP까지 성공. **P4·메이플스토리 실기기 / UAC 승인·취소 / GitHub 토큰을 사용한 업데이트 종단 간 검사는 이 CI로 검증되지 않았습니다.**
+
+## 1.1.10 Windows CI / 릴리스 후보 증거
+
+[PR #8 빌드 #42832500112](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112): SHA-256 매니페스트 일치, .NET 8 Windows 컴파일/self-contained EXE, 기본206/206 + UI80/80 + updater11/11 + startup11/11 = **308/308개** 통과. WinForms **메인·설정·독립 업데이트 창** 실제 화면 캡처, EXE·게임 CMD/PS1 동일 폴더 ZIP 업로드 성공.
+
+**실사용 PC 별도:** 예약 작업 등록/UAC/로그오프 후 로그인 최고 권한 확인, 메이플스토리 후킹/전경, GitHub 읽기 토큰을 통한 실제 다운로드·EXE 교체/롤백, Peek/Menu/Focus 25개 고유 회귀는 이번 무인 CI의 검증 범위가 아님.
