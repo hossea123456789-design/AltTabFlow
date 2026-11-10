@@ -48,7 +48,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AltTabFlow-actual-Windows-preview
-          path: artifacts/ui-preview/AltTabFlow-1.1.2-actual.png
+          path: artifacts/ui-preview/AltTabFlow-1.1.4-actual.png
           if-no-files-found: error
           retention-days: 30
       - name: Upload candidate for manual Windows validation
