@@ -17,7 +17,7 @@ namespace AltTabFlow;
 internal static class GitHubUpdater
 {
     private const string Repo="hossea123456789-design/AltTabFlow";
-    internal const string ArtifactName="AltTabFlow-v1.1.9-win-x64-CANDIDATE";
+    internal const string ArtifactName="AltTabFlow-win-x64-CANDIDATE";
     private static readonly Uri ApiRoot=new("https://api.github.com/");
     private static bool busy;
     private sealed record Candidate(Version Version,long RunId,long ArtifactId,string? Digest,string Sha);
