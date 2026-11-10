@@ -9,9 +9,9 @@
 | 1.1.1 | 원본 완전 명세와 복원 스크립트, WinForms 25파일, MRU·Peek·테마·게임 호환 | 기본 72 + Peek 10 | Linux 작업 환경에서 소스·SHA 검증. Windows EXE 생성/실동작 재검증은 하지 않음 |
 | 1.1.2 | ContextMenuStrip Closed/Dispose 생명주기 오류 수정, 초기화/런타임 오류 분리, 메뉴 7개 검사 | 89 (72+10+7) | 소스/패치 복원 후 비공개 GitHub 저장소 최초 등록. 초기 Windows CI 컴파일+실제 UI screenshot 성공 |
 | 1.1.3 | 전경 전환 회귀 발생, 1.1.4에서 해결하도록 갱신 명세가 지시 | 별도 최종판 아님 | 이 저장소의 정식 안정 버전으로 취급하지 않음 |
-| 1.1.4 | P4 소유 팝업·실제 클릭 창 기준 MRU, 전경 활성화 확인, QuickGesture/FX 최적화, Switching.cs 추가 | 112 (기본87+Peek10+메뉴7+Focus18−중복10) | [PR #2](../pull/2), [Windows 성공 CI](../actions/runs/42764686888), [main merge](../commit/b2e5aa57d031d7201d40788fa6bcf7db290509a1) |
-| 1.1.5 | 일반 Alt+Tab 방향키 탐색 시 자동 고정 제거, 마지막 key-up 커밋·Esc 취소 | 142 (117+10+7+18−10) | [PR #3](../pull/3), [Windows CI 기본117](../actions/runs/42766936582), [main merge](../commit/c26cc1237c1920d374487a91f154c4c8284f2694) |
-| 1.1.6 | 설정 좌측 메뉴/우측 카드/하단 고정 저장, 7종 테마, owner-draw UI, mouse-up 커밋, UI 62개 | 204 (117+10+7+18+62−10) | [PR #4](../pull/4), [Windows CI 기본117+UI62](../actions/runs/42768914976), [main merge](../commit/93fb3164a1945016926526730b791ffb1f6f4140) |
+| 1.1.4 | P4 소유 팝업·실제 클릭 창 기준 MRU, 전경 활성화 확인, QuickGesture/FX 최적화, Switching.cs 추가 | 112 (기본87+Peek10+메뉴7+Focus18−중복10) | [PR #2](https://github.com/hossea123456789-design/AltTabFlow/pull/2), [Windows 성공 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42764686888), [main merge](https://github.com/hossea123456789-design/AltTabFlow/commit/b2e5aa57d031d7201d40788fa6bcf7db290509a1) |
+| 1.1.5 | 일반 Alt+Tab 방향키 탐색 시 자동 고정 제거, 마지막 key-up 커밋·Esc 취소 | 142 (117+10+7+18−10) | [PR #3](https://github.com/hossea123456789-design/AltTabFlow/pull/3), [Windows CI 기본117](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42766936582), [main merge](https://github.com/hossea123456789-design/AltTabFlow/commit/c26cc1237c1920d374487a91f154c4c8284f2694) |
+| 1.1.6 | 설정 좌측 메뉴/우측 카드/하단 고정 저장, 7종 테마, owner-draw UI, mouse-up 커밋, UI 62개 | 204 (117+10+7+18+62−10) | [PR #4](https://github.com/hossea123456789-design/AltTabFlow/pull/4), [Windows CI 기본117+UI62](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42768914976), [main merge](https://github.com/hossea123456789-design/AltTabFlow/commit/93fb3164a1945016926526730b791ffb1f6f4140) |
 | **1.1.7** | 숨길 앱 Enter 줄바꿈, Ctrl+Alt+Tab 고정·반복·늦은 Ctrl 승격, 상단 등록 앱 아이콘·폴백·비동기 로딩 | **257 (161+10+7+18+71−10)** | 이번 세션에 소스 diff 9개와 문서 반영. **독립 GitHub CI·사용자 PC 실행 결과는 최신 PR에서 확인** |
 
 ## GitHub 전환과 관리 결정
@@ -19,7 +19,7 @@
 - 비공개 저장소 `hossea123456789-design/AltTabFlow`를 초기화했습니다.
 - 초기 원본과 1.1.2 변경을 Git으로 등록하고, GitHub Actions Windows 빌드·테스트 후보 EXE 업로드, 메인/설정 화면 캡처 자동화 및 Issues/PR 템플릿을 추가했습니다.
 - 이후 요청은 GitHub 별도 브랜치 → PR → CI → `main` 병합 흐름으로 관리. CI 컴파일과 실사용 회귀 테스트는 구별했습니다.
-- [Issue #1](../issues/1)은 **버전마다 갱신하는 실사용 검증의 단일 체크리스트**입니다. 검증 미완료 상태에서 정식 GitHub Release를 만들지 않습니다.
+- [Issue #1](https://github.com/hossea123456789-design/AltTabFlow/issues/1)은 **버전마다 갱신하는 실사용 검증의 단일 체크리스트**입니다. 검증 미완료 상태에서 정식 GitHub Release를 만들지 않습니다.
 - 버전별 원문 명세를 `docs/` 아래에 보관. 1.1.1 완전 원문은 `docs/1.1.1-완전명세-아카이브.md`, 후속 패치는 `docs/1.1.2-변경명세.md`, `docs/1.1.4-변경명세.md`, `docs/1.1.5-변경명세.md`, `docs/1.1.6-UI개선-변경명세.md`, `docs/specs/AltTabFlow_1.1.7_갱신내용.md`입니다.
 
 ## 추적해야 할 중요한 회귀/설계 결정

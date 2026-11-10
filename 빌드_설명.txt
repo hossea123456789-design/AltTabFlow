@@ -1,5 +1,12 @@
-AltTabFlow 1.1.6 | Windows x64 소스·빌드 키트
-설정 UI를 왼쪽 메뉴/카드/하단 고정 저장으로 개편했습니다.
-새 UiControls.cs, UiTests.cs를 포함한 29개 소스·자원 파일입니다.
-기존 기본 검사 117, 신규 UI 62, Peek 10, 메뉴 7, Focus 18(10 중복) = 고유 204개 검사입니다.
-GitHub CI 빌드와 사용자 Windows 실기기/게임 모드 검증은 구분합니다.
+AltTabFlow 1.1.7 / Windows x64
+
+이 저장소는 1.1.1부터 GitHub에서 이어진 원본 소스와 변경 이력입니다.
+최신 작업 인계: docs/PROJECT_HANDOFF.md
+버전 이력: docs/DEVELOPMENT_HISTORY.md
+사용자 명세 원문: docs/specs/AltTabFlow_1.1.7_갱신내용.md
+
+이번 수정: 숨길 앱 Enter 줄바꿈, Ctrl+Alt+Tab 고정, 상단 등록 앱 실제 아이콘 및 폴백.
+기본 161+UI 71+Peek 10+메뉴 7+Focus 18(10 중복)=고유 257개(사용자 명세 내 검증 기록).
+GitHub CI에서 실행한 결과와 Windows 사용자 실기기 검증 결과는 구분해야 합니다.
+압축 해제 후 Windows-Build.cmd 또는 package.ps1로 빌드합니다.
+사용자 설정·창 제목·진단 로그는 GitHub에 올리지 마세요.
