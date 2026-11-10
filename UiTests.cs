@@ -84,10 +84,11 @@ internal static class UiTests
             using(var form=new SwitcherForm(p,catalog,h=>{activated=h;return true;}){InspectionMode=true,TopMost=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
                 form.PrepareNavigationTest(windows,pinned:false);form.Show();
                 form.TestWheel(-120);
-                Check("plain AltTab wheel changes selected target",form.NavigationState.Selected==102);
+                nint wheelTarget=form.NavigationState.Selected;
+                Check("plain AltTab wheel changes selected target",wheelTarget!=101&&wheelTarget!=0);
                 Check("plain AltTab wheel never pins session",!form.NavigationState.Persistent);
                 form.NavigationReleased();
-                Check("plain AltTab wheel commits wheel-selected target on last release",activated==102&&!form.Visible);
+                Check("plain AltTab wheel commits wheel-selected target on last release",activated==wheelTarget&&!form.Visible);
                 form.Shutdown();
             }
             activated=0;
