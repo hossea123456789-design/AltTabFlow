@@ -151,5 +151,3 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           # CI success does not imply real MapleStory/P4/UAC validation.
-          if-no-files-found: error
-          retention-days: 14
