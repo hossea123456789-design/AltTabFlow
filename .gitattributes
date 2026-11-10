@@ -1,0 +1,7 @@
+# Keep repository source bytes deterministic on Windows Git checkouts.
+# SHA-256 manifest corresponds to the committed LF-ending source files.
+* text=auto eol=lf
+*.ico binary
+*.png binary
+*.zip binary
+*.exe binary
