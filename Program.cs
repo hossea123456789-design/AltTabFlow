@@ -68,6 +68,17 @@ internal static class Program
     }
 }
 
+// Keep physical Alt+Tab storms from starving the WinForms message pump.
+internal static class InputDrainPolicy
+{
+    internal const int MaxCommandsPerPass = 48;
+    internal const int MaxMillisecondsPerPass = 8;
+    internal static int SnapshotLimit(int processed)
+        => Math.Max(0, MaxCommandsPerPass - processed);
+    internal static bool ShouldYield(int processed, TimeSpan elapsed)
+        => processed >= MaxCommandsPerPass || elapsed.TotalMilliseconds >= MaxMillisecondsPerPass;
+}
+
 internal sealed class SwitcherContext : ApplicationContext
 {
     private readonly Preferences prefs=Preferences.Load();
@@ -121,21 +132,42 @@ internal sealed class SwitcherContext : ApplicationContext
         using var icon=new Icon(stream!,32,32); return (Icon)icon.Clone();
     }
     private void PostDrain() {
-        if(closing||form.IsDisposed||pendingInput.IsEmpty||Interlocked.Exchange(ref drainPosted,1)!=0)return;
-        try{form.BeginInvoke((Action)DrainInput);}catch(InvalidOperationException){Interlocked.Exchange(ref drainPosted,0);}
+        if(closing||form.IsDisposed||pendingInput.IsEmpty||
+           Interlocked.CompareExchange(ref drainPosted,1,0)!=0)return;
+        // Keep the lease raised while draining; never post one callback per key.
+        try{form.BeginInvoke((Action)DrainInput);}
+        catch(ObjectDisposedException){Interlocked.Exchange(ref drainPosted,0);}
+        catch(InvalidOperationException){Interlocked.Exchange(ref drainPosted,0);}
     }
     private void DrainInput() {
-        Interlocked.Exchange(ref drainPosted,0);
-        if(closing)return;
-        while(!form.IsCommitting&&!pendingInput.IsEmpty) {
-            var batch=pendingInput.ToArray();
-            int length=!form.Visible&&!form.IsConfiguring?QuickGesture.Length(batch,0):0;
-            if(length>0) {
-                var gesture=new List<ShortcutInput>();
-                for(int i=0;i<length;i++)if(pendingInput.TryDequeue(out var input))gesture.Add(input);
-                form.QuickSwitch(gesture);continue;
+        long started=Stopwatch.GetTimestamp();
+        int processed=0;
+        try {
+            if(closing)return;
+            // Bounded FIFO: always yield for Paint and commit watchdog timers.
+            while(!closing&&!form.IsCommitting&&!pendingInput.IsEmpty&&
+                  !InputDrainPolicy.ShouldYield(processed,Stopwatch.GetElapsedTime(started))) {
+                // Avoid quadratic copying of the entire concurrent queue.
+                var batch=pendingInput.Take(InputDrainPolicy.SnapshotLimit(processed)).ToArray();
+                if(batch.Length==0)break;
+                int length=!form.Visible&&!form.IsConfiguring?QuickGesture.Length(batch,0):0;
+                if(length>0) {
+                    var gesture=new List<ShortcutInput>();
+                    for(int i=0;i<length;i++)
+                        if(pendingInput.TryDequeue(out var input))gesture.Add(input);
+                    processed+=gesture.Count;
+                    if(gesture.Count>0)form.QuickSwitch(gesture);
+                    continue;
+                }
+                if(pendingInput.TryDequeue(out var next)){processed++;Handle(next);}
+                else break;
             }
-            if(pendingInput.TryDequeue(out var next))Handle(next);
+        }
+        finally {
+            // A synchronous CommitFinished can re-enter PostDrain. Always
+            // release the lease and reschedule any remaining commands here.
+            Interlocked.Exchange(ref drainPosted,0);
+            if(!closing&&!form.IsCommitting&&!pendingInput.IsEmpty)PostDrain();
         }
     }
     private void Handle(ShortcutInput input) {

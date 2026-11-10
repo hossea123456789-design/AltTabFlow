@@ -1,5 +1,14 @@
 # 아키텍처 및 회귀 방지 불변 조건
 
+## 1.1.14 빠른 Alt+Tab 큐 안정성 불변 조건
+
+- 키보드 훅 스레드 명령은 FIFO를 보존하고, WinForms UI 드레인은 한 메시지에서 최대 48명령 또는 8ms까지만 처리한 뒤 Paint/WM_TIMER/Commit 확인에 메시지 처리 기회를 주어야 합니다.
+- `drainPosted` 플래그는 실제 드레인 종료 시점에 초기화하며 동기 `CommitFinished` 재진입/예외 시 잔여 큐를 누락하지 않도록 다시 게시합니다.
+- 매 명령 큐 전체 `ToArray()` 금지. 이미 chooser 자체가 foreground이면 불필요한 `activation.Request(Handle)` 재시작 금지.
+- 일반 마지막 key-up 한 번 Commit, 명시적 고정, ESC 취소, 게임 Z-order/Peek 복원 및 900ms 유한 활성화 제한 불변.
+
+
+
 ## 구성과 의존성
 
 - **플랫폼:** Windows x64, .NET 8, WinForms·GDI. Windows 시스템 Alt+Tab 파일을 수정하지 않음.

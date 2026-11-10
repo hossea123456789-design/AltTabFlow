@@ -1,5 +1,16 @@
 # AltTabFlow — 후속 세션 인계 / START HERE
 
+## 1.1.14 빠른 Alt+Tab 반복 입력·후속 먹통 방지 (2026-11-11)
+
+- 기존 1.1.13 메이플 프리뷰/포커스 수정은 PR #11, CI #42855755651(335개) 성공 이후 main 병합 커밋 cde56a70.
+- 추가 사용자 증상: Alt+Tab 빠른 반복 중 UI가 오래 남다가 사라진 뒤 다음 입력도 먹통처럼 보임.
+- 정적 코드의 유력 위험: `SwitcherContext.DrainInput`이 큐가 빌 때까지 UI 루프를 무제한 점유하고, 매 처리마다 전체 대기 큐 `ToArray()` 복사 및 드레인 중복 `BeginInvoke` 가능. WinForms Paint/WM_TIMER/Commit 동작 지연으로 연결될 수 있음.
+- 대응: UI 턴당 **최대 48명령 또는 8ms** 처리 후 잔여 FIFO 재예약; `drainPosted`는 드레인 종료 시 해제, `CommitFinished` 동기 재진입 보호. 이미 chooser가 foreground면 중복 활성화 Request 생략.
+- PR 브랜치 `fix/v1.1.14-rapid-alt-tab-queue-stability`, CI 목표 기본 206 + UI 99 + updater 22 + 관리자 11 = **338건**.
+- 실제 메이플 Alt+Enter, 키 연타 10~30회, 포커스/UAC/자동 EXE 교체는 Windows 사용자 환경에서 별도 검증.
+
+
+
 ## 1.1.13 사용자 실사용 증상과 패치 설계
 
 - 사용자 스크린샷 (사용자 개인 업로드이며 GitHub에는 업로드하지 않음): 메이플 목록에서 MapleStory 항목을 거친 다음 전환 UI가 1~2회의 Alt+Tab 동안 가려졌다가 복구됨. 오른쪽 썸네일 카드의 `선택한 창 미리보기` 라벨과 창 제목 `MapleStory`의 글자 겹침.

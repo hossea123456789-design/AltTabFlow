@@ -2,7 +2,7 @@
 
 **세션 간 후속 작업 시작점: [PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md)** · [전체 개발 이력](docs/DEVELOPMENT_HISTORY.md) · [동작 불변 조건](docs/ARCHITECTURE_AND_INVARIANTS.md) · [검증 매트릭스](docs/TEST_MATRIX.md)
 
-Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.13**입니다.
+Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.14**입니다.
 
 > **업데이트/배포:** 기존 저장소 `hossea123456789-design/AltTabFlow` 자체가 Public인 경우 같은 저장소의 공개 Releases에서 익명으로 버전과 SHA-256을 확인하고 앱 버튼으로 교체합니다. 별도의 `AltTabFlow-Downloads` 저장소나 배포 PAT는 불필요합니다. **저장소 Public 및 [v1.1.12 공개 릴리스 게시 완료](https://github.com/hossea123456789-design/AltTabFlow/releases/tag/v1.1.12).**
 
@@ -19,6 +19,10 @@ Alt+Enter로 확장된 메이플스토리가 최대화 또는 전체화면 상�
 설정 → 업데이트 확인으로 **같은 공개 GitHub 저장소**의 Releases에서 새로운 Windows EXE를 받습니다. 사용자 GitHub 로그인/PAT는 요구하지 않습니다. 자동 배포는 성공한 Windows CI와 같은 `main` SHA의 실행 파일만 사용하고, `GITHUB_TOKEN`으로 공개 프리릴리스를 생성합니다. 앱은 업로드된 ZIP의 SHA-256과 EXE 버전을 검증하고 재시작합니다.
 
 **최초 공개 전환 절차(현재 완료):** GitHub 관리 권한 보유자가 저장소 Settings → General → Danger Zone → Change repository visibility → Public을 한 번 승인해야 합니다. 자동 배포 워크플로는 Private 상태에서 릴리스를 만들지 않으며, Public으로 전환하면 GitHub의 `public` 이벤트가 배포 작업을 자동 실행합니다. 별도 Actions 수동 실행은 필요하지 않습니다. 저장소 공개는 과거 커밋·이슈·로그까지 공개될 수 있어 사전 점검이 필요합니다.
+
+## 1.1.14: 빠른 Alt+Tab 연속 입력 안정성
+
+단일 UI 이벤트에서 대기 입력을 무제한 처리하지 않도록 48명령/8ms 단위로 분할하여 화면 갱신과 전환 확정 타이머를 보호합니다. 명령 FIFO 순서와 마지막 키 해제 확정을 유지하고, 커밋 이후 대기 입력 재예약 및 중복 메시지 게시 억제를 적용합니다. CI 목표 338건이며 실제 메이플 전체화면과 고속 물리 키 입력은 실기기 확인이 필요합니다.
 
 ## 1.1.13: 메이플스토리 Alt+Enter 전환창 사라짐·미리보기 글자 겹침 수정
 

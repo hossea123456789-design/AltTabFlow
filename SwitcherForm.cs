@@ -196,7 +196,7 @@ internal sealed class SwitcherForm : Form
         lastNavigationTick=Stopwatch.GetTimestamp();
         // Each Alt+Tab gesture selects its own lifetime. A previously pinned UI
         // must not prevent a new plain gesture from committing on key release.
-        if (Visible) { persistent = pinned; releaseTimestamp=0;if(!pinned)ActiveControl=null;ReassertOverlayZOrder();activation.Request(Handle); MoveSelection(direction); return; }
+        if (Visible) { persistent = pinned; releaseTimestamp=0;if(!pinned)ActiveControl=null;ReassertOverlayZOrder();if(!WindowIdentity.Same(Native.GetForegroundWindow(),Handle))activation.Request(Handle); MoveSelection(direction); return; }
         opening = Stopwatch.StartNew();
         PrepareSwitcher(pinned,direction,sameApp);
         ApplyBounds();EnsurePage(); ApplyTheme();
