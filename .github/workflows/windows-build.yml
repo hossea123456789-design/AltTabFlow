@@ -25,7 +25,7 @@ jobs:
       - name: Compile release
         shell: pwsh
         run: |
-          dotnet restore .\AltTabFlow.csproj --runtime win-x64
+          dotnet restore .\AltTabFlow.csproj --runtime win-x64 -p:PublishReadyToRun=true
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet build .\AltTabFlow.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -35,6 +35,22 @@ jobs:
           dotnet publish .\AltTabFlow.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=true -p:EnableCompressionInSingleFile=false -p:DebugType=None -p:DebugSymbols=false --output .\artifacts\ci-publish
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Test-Path '.\artifacts\ci-publish\AltTabFlow.exe')) { throw 'Missing candidate executable' }
+      - name: Capture actual UI preview on Windows runner
+        id: screenshot
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          dotnet build .\tools\TestWindows\TestWindows.csproj --configuration Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\tools\CapturePreview.ps1
+      - name: Upload actual preview screenshot if available
+        if: steps.screenshot.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltTabFlow-actual-Windows-preview
+          path: artifacts/ui-preview/AltTabFlow-1.1.2-actual.png
+          if-no-files-found: error
+          retention-days: 30
       - name: Upload candidate for manual Windows validation
         uses: actions/upload-artifact@v4
         with:
