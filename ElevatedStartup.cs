@@ -14,6 +14,12 @@ internal static class ElevatedStartup
     internal static bool UseRegistryRun(bool start,bool elevated)=>start&&!elevated;
     internal static bool UseElevatedTask(bool start,bool elevated)=>start&&elevated;
     internal static string LaunchArguments=>"--background";
+    // A highest-privilege task must NOT point at a user-writable Downloads,
+    // Desktop or AppData executable. Install the signed/verified candidate
+    // into the admin-protected Program Files folder first.
+    internal static string ProtectedInstallPath =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "AltTabFlow","AltTabFlow.exe");
     private static WindowsIdentity Identity=>WindowsIdentity.GetCurrent();
     private static string CurrentSid=>Identity.User?.Value??throw new InvalidOperationException("Windows 사용자 SID를 확인할 수 없습니다.");
 
@@ -42,7 +48,7 @@ internal static class ElevatedStartup
         if(enable&&string.IsNullOrWhiteSpace(Environment.ProcessPath))
             throw new InvalidOperationException("실행 파일 경로를 확인할 수 없습니다.");
         if(enable&&MessageBox.Show(owner,
-            "Windows 로그인 시 AltTabFlow를 관리자 권한으로 자동 실행합니다.\n\n한 번만 UAC 승인이 필요하며, 이후 로그인에서는 관리자 확인창 없이 실행됩니다.\n등록할 파일을 이동하면 작업을 다시 등록해야 합니다.\n\n설정하시겠습니까?",
+            "Windows 로그인 시 AltTabFlow를 관리자 권한으로 자동 실행합니다.\n\n한 번만 UAC 승인이 필요하며, 이후 로그인에서는 관리자 확인창 없이 실행됩니다.\n실행 파일은 보안을 위해 Program Files 보호 폴더에 설치됩니다.\n\n설정하시겠습니까?",
             "관리자 자동 시작 등록",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return false;
 
         var info=new ProcessStartInfo(Environment.ProcessPath!){
@@ -85,8 +91,17 @@ internal static class ElevatedStartup
                 return 0;
             }
             string file=Path.GetFullPath(args[3]);
-            if(!File.Exists(file)||!file.EndsWith("AltTabFlow.exe",StringComparison.OrdinalIgnoreCase))
+            if(!File.Exists(file)||!string.Equals(Path.GetFileName(file),"AltTabFlow.exe",StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("유효한 AltTabFlow.exe가 아닙니다.");
+            string protectedPath=ProtectedInstallPath;
+            Directory.CreateDirectory(Path.GetDirectoryName(protectedPath)!);
+            if(!string.Equals(file,protectedPath,StringComparison.OrdinalIgnoreCase))
+                File.Copy(file,protectedPath,true);
+            // Copy optional game compatibility scripts alongside the protected EXE.
+            foreach(var companion in new[]{"Game-compat-mode.cmd","Run-GameCompat.ps1","사용법.txt"}){
+                string source=Path.Combine(Path.GetDirectoryName(file)!,companion);
+                if(File.Exists(source))File.Copy(source,Path.Combine(Path.GetDirectoryName(protectedPath)!,companion),true);
+            }
             dynamic definition=service.NewTask(0);
             definition.RegistrationInfo.Description="AltTabFlow - Windows 로그인 시 현재 사용자로 관리자 권한 창 전환 실행";
             definition.Principal.UserId=Identity.Name;
@@ -96,9 +111,9 @@ internal static class ElevatedStartup
             trigger.UserId=Identity.Name;
             trigger.Enabled=true;
             dynamic action=definition.Actions.Create(0); // TASK_ACTION_EXEC
-            action.Path=file;
+            action.Path=protectedPath;
             action.Arguments=LaunchArguments;
-            action.WorkingDirectory=Path.GetDirectoryName(file)!;
+            action.WorkingDirectory=Path.GetDirectoryName(protectedPath)!;
             definition.Settings.Enabled=true;
             definition.Settings.StartWhenAvailable=true;
             definition.Settings.ExecutionTimeLimit="PT0S";
@@ -128,6 +143,8 @@ internal static class StartupTests
         Check("Elevated autostart suppresses Run key",!ElevatedStartup.UseRegistryRun(true,true));
         Check("No autostart suppresses Run key",!ElevatedStartup.UseRegistryRun(false,false));
         Check("Elevated task uses background mode",ElevatedStartup.LaunchArguments=="--background");
+        Check("Elevated task executable is stored under Program Files",ElevatedStartup.ProtectedInstallPath.StartsWith(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),StringComparison.OrdinalIgnoreCase));
         Check("Task name is stable for Windows SID",ElevatedStartup.TaskName("S-1-5-21-123")=="AltTabFlow.Elevated.S_1_5_21_123");
         Check("Task name differs across Windows accounts",ElevatedStartup.TaskName("S-1-1-1")!=ElevatedStartup.TaskName("S-1-1-2"));
         Check("Two startup mechanisms cannot both be enabled",!Enumerable.Range(0,2).Any(i=>Enumerable.Range(0,2).Any(j=>ElevatedStartup.UseRegistryRun(i!=0,j!=0)&&ElevatedStartup.UseElevatedTask(i!=0,j!=0))));
