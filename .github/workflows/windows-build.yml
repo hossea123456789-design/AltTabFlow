@@ -18,6 +18,9 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+      - name: Verify source/resource SHA-256 manifest
+        shell: pwsh
+        run: .\tools\Verify-SourceHashes.ps1
       - name: Install .NET SDK 8
         uses: actions/setup-dotnet@v4
         with:
