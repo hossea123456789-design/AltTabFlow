@@ -8,13 +8,14 @@ using System.Text.RegularExpressions;
 
 namespace AltTabFlow;
 
-// PUBLIC BINARY FEED ONLY: source repository stays private.
-// The client never reads its contents, Actions, account data or GitHub tokens.
-// The update ZIP must be attached to a published Release in the dedicated
-// binary-only public repository, and GitHub must provide a SHA-256 asset digest.
+// SINGLE PUBLIC REPOSITORY: authenticated source operations are NOT needed.
+// The user makes this existing repository Public once in GitHub settings.
+// GitHub Actions publishes a versioned Release into that SAME repository,
+// and application clients read the anonymous public Releases API.
+// Only GitHub's published asset digest is trusted for ZIP integrity.
 internal static class GitHubUpdater
 {
-    internal const string PublicRepo="hossea123456789-design/AltTabFlow-Downloads";
+    internal const string PublicRepo="hossea123456789-design/AltTabFlow";
     internal const string ReleaseAsset="AltTabFlow-win-x64.zip";
     internal const bool RequiresAuthentication=false;
     private static readonly Uri ApiRoot=new("https://api.github.com/");
@@ -69,9 +70,9 @@ internal static class GitHubUpdater
             report?.Invoke("업데이트 확인 또는 다운로드를 취소했습니다. 현재 버전을 유지합니다.");
         }
         catch(HttpRequestException ex) when(ex.StatusCode==HttpStatusCode.NotFound){
-            report?.Invoke("공개 배포 저장소가 아직 생성되지 않았거나 릴리스가 없습니다.");
+            report?.Invoke("GitHub 저장소가 아직 비공개이거나 공개 릴리스가 없습니다.");
             if(!owner.IsDisposed)MessageBox.Show(owner,
-                "실행 파일 전용 공개 GitHub 저장소가 준비되지 않았습니다.\n" +
+                "기존 AltTabFlow 저장소가 아직 Public으로 전환되지 않았거나 공개 릴리스가 없습니다.\n" +
                 "현재 버전은 유지됩니다. 인증 토큰은 필요하지 않습니다.",
                 "AltTabFlow 공개 배포 대기",MessageBoxButtons.OK,MessageBoxIcon.Information);
         }
@@ -299,7 +300,7 @@ internal static class UpdaterTests
         Test("Version reads from csproj",Version.TryParse("1.1.9",out var parsed)&&parsed==new Version(1,1,9));
         Test("new version exceeds installed",new Version(1,1,9)>new Version(1,1,8));
         Test("equal version is not an update",!(new Version(1,1,8)>new Version(1,1,8)));
-        Test("public GitHub API accepted without token",!GitHubUpdater.RequiresAuthentication&&GitHubUpdater.ApprovedRedirect(new Uri("https://api.github.com/repos/hossea123456789-design/AltTabFlow-Downloads/releases")));
+        Test("single public GitHub repository with no user token",!GitHubUpdater.RequiresAuthentication&&GitHubUpdater.PublicRepo=="hossea123456789-design/AltTabFlow"&&GitHubUpdater.ApprovedRedirect(new Uri("https://api.github.com/repos/hossea123456789-design/AltTabFlow/releases")));
         Test("GitHub release asset CDN accepted",GitHubUpdater.ApprovedRedirect(new Uri("https://release-assets.githubusercontent.com/path")));
         Test("redirect with userinfo rejected",!GitHubUpdater.ApprovedRedirect(new Uri("https://user:secret@api.github.com/")));
         Test("insecure URL rejected",!GitHubUpdater.ApprovedRedirect(new Uri("http://api.github.com/")));
