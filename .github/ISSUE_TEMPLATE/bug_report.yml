@@ -1,0 +1,30 @@
+name: 버그 제보
+description: AltTabFlow 동작 오류 및 재현 절차
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: textarea
+    id: symptoms
+    attributes:
+      label: 증상
+      description: 어떤 동작이 기대와 다르게 실행되나요?
+      placeholder: '예: 우클릭 메뉴 밖 클릭 후 프로그램이 종료됨'
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 절차
+      placeholder: '1. ... 2. ...'
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 버전과 Windows 환경
+      placeholder: '1.1.2 / Windows 11 / DPI 125%'
+  - type: textarea
+    id: logs
+    attributes:
+      label: 검증 결과 또는 오류 메시지
+      description: 창 제목, 사용자 경로, 개인 정보는 지우고 첨부하세요.

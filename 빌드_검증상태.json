@@ -1,0 +1,16 @@
+{
+  "version": "1.1.2",
+  "sourceFiles": 26,
+  "modifiedOrNewFiles": 7,
+  "patchBase": "AltTabFlow 1.1.1 full specification",
+  "patchSource": "AltTabFlow_1.1.2_갱신내용만.md",
+  "staticCheck": "PASS",
+  "windowsBuild": "NOT_RUN",
+  "windowsRuntimeTests": "NOT_RUN",
+  "expectedWindowsTests": {
+    "basic": 72,
+    "peek": 10,
+    "menu": 7
+  },
+  "note": "GitHub transfer: source compared to specification; Windows validation not run."
+}

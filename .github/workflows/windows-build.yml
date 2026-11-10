@@ -1,0 +1,48 @@
+name: Windows compile (not full UI validation)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: Build and publish candidate
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Install .NET SDK 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Compile release
+        shell: pwsh
+        run: |
+          dotnet restore .\AltTabFlow.csproj --runtime win-x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build .\AltTabFlow.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish self-contained candidate
+        shell: pwsh
+        run: |
+          dotnet publish .\AltTabFlow.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=true -p:EnableCompressionInSingleFile=false -p:DebugType=None -p:DebugSymbols=false --output .\artifacts\ci-publish
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path '.\artifacts\ci-publish\AltTabFlow.exe')) { throw 'Missing candidate executable' }
+      - name: Upload candidate for manual Windows validation
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltTabFlow-windows-candidate-NOT-UI-VERIFIED
+          path: |
+            artifacts/ci-publish/AltTabFlow.exe
+            사용법.txt
+            Game-compat-mode.cmd
+            Run-GameCompat.ps1
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,22 @@
+name: 기능 제안
+description: 기존 Alt+Tab 동작 계약을 유지하는 개선안
+title: '[Feature] '
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 해결하려는 문제
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 기대 동작과 조작 순서
+    validations:
+      required: true
+  - type: textarea
+    id: regression
+    attributes:
+      label: 기존 기능 회귀 위험
+      description: MRU, 빠른/상세 전환, 창 미리 표시, 설정 등 영향 영역을 기술합니다.
