@@ -128,7 +128,8 @@ internal sealed class SwitcherContext : ApplicationContext
             case SwitchCommand.SameApp: form.OpenSwitcher(false,1,true); break;
             case SwitchCommand.SameAppPrevious: form.OpenSwitcher(false,-1,true); break;
             case SwitchCommand.Persistent: form.TogglePersistent(); break;
-            case SwitchCommand.Commit: form.AltReleased(input.Timestamp); break;
+            case SwitchCommand.Commit: form.NavigationReleased(input.Timestamp); break;
+            case SwitchCommand.Cancel: form.Dismiss(true); break;
             case SwitchCommand.Pause: TogglePause(); break;
             case SwitchCommand.Left: form.DetailedNavigate(Keys.Left); break;
             case SwitchCommand.Right: form.DetailedNavigate(Keys.Right); break;
@@ -256,10 +257,42 @@ internal static class SelfTests
         commands.Clear();Route(9,shift:true);Route(9,false);Route(0xA4,false);
         Check("Shift 역방향 후 Alt 해제 확정",commands.SequenceEqual(new[]{SwitchCommand.Previous,SwitchCommand.Commit}));
         commands.Clear();Route(9);Route(9,false);Route(0x27);Route(0x27,false);Route(0xA4,false);
-        Check("Alt 유지 중 방향키는 Commit보다 먼저 상세 조작 처리",commands.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Right,SwitchCommand.Commit}));
+        Check("Alt 유지 중 방향키 이동은 최종 해제 Commit보다 먼저 처리",commands.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Right,SwitchCommand.Commit}));
         commands.Clear();Route(9);Route(9,false);Route(0xA4,false,otherAlt:true);Check("양쪽 Alt 중 하나만 놓으면 확정하지 않음",commands.Count==1);Route(0xA5,false);
         commands.Clear();Check("일시 중지 중 AltTab은 가로채지 않음",!Route(9,enabled:false)&&commands.Count==0);
         commands.Clear();Route(0x20,ctrl:true);Route(0x20,ctrl:true);Route(0x20,false);Check("명시적 CtrlAltSpace만 열기 닫기 토글",commands.SequenceEqual(new[]{SwitchCommand.Persistent}));
+        // Key-up ordering matters: the last held key, not Alt-up alone, commits.
+        var releaseCommands=new List<SwitchCommand>();var releaseRouter=new ShortcutRouter(releaseCommands.Add);
+        bool Key(uint key,bool down,bool alt=false,bool ctrl=false,bool shift=false,bool otherAlt=false,bool otherCtrl=false,bool otherShift=false)=>releaseRouter.Route(key,down,alt,ctrl,shift,true,otherAlt,otherCtrl,otherShift);
+        void BeginReleaseCase(){releaseCommands.Clear();releaseRouter=new ShortcutRouter(releaseCommands.Add);Key(0xA4,true);Key(9,true,true);Key(9,false,true);}
+        BeginReleaseCase();Key(0x27,true,true);Key(0xA4,false);
+        Check("Alt를 먼저 놓아도 화살표를 잡고 있으면 아직 확정하지 않음",!releaseCommands.Contains(SwitchCommand.Commit));
+        Key(0x27,true);Key(0x27,false);Key(0x27,false);
+        Check("Alt 해제 뒤 화살표 반복 이동 후 마지막 해제에 정확히 한 번 확정",releaseCommands.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Right,SwitchCommand.Right,SwitchCommand.Commit}));
+        BeginReleaseCase();Key(0x25,true,true);Key(0x25,false,true);
+        Check("화살표를 먼저 놓아도 Alt를 잡고 있으면 선택 화면 유지",!releaseCommands.Contains(SwitchCommand.Commit));Key(0xA4,false);
+        Check("화살표 먼저 해제 후 Alt 해제로 확정",releaseCommands.Last()==SwitchCommand.Commit);
+        BeginReleaseCase();Key(9,true,true);Key(0xA4,false);
+        Check("Tab을 잡고 있으면 Alt 해제만으로 확정하지 않음",!releaseCommands.Contains(SwitchCommand.Commit));Key(9,false);
+        Check("Alt 다음 Tab 해제도 확정",releaseCommands.Last()==SwitchCommand.Commit);
+        BeginReleaseCase();Key(0x25,true,true);Key(0x26,true,true);Key(0xA4,false);Key(0x25,false);
+        Check("화살표 둘 중 하나만 놓으면 확정하지 않음",!releaseCommands.Contains(SwitchCommand.Commit));Key(0x26,false);
+        Check("여러 화살표 중 마지막 키 해제로 확정",releaseCommands.Last()==SwitchCommand.Commit);
+        BeginReleaseCase();Key(0xA0,true,true,shift:true);Key(0xA4,false,shift:true);
+        Check("Shift를 누른 채면 기다림",!releaseCommands.Contains(SwitchCommand.Commit));Key(0xA0,false,shift:true,otherShift:true);
+        Check("양쪽 Shift 중 하나만 놓아도 계속 기다림",!releaseCommands.Contains(SwitchCommand.Commit));Key(0xA1,false,shift:true);
+        Check("현재 Shift-up 이벤트로 마지막 해제 판단",releaseCommands.Last()==SwitchCommand.Commit);
+        BeginReleaseCase();Key(0xA2,true,true,ctrl:true);Key(0xA4,false,ctrl:true);Key(0xA2,false,ctrl:true,otherCtrl:true);
+        Check("양쪽 Ctrl 중 하나만 놓아도 계속 기다림",!releaseCommands.Contains(SwitchCommand.Commit));Key(0xA3,false,ctrl:true);
+        Check("현재 Ctrl-up 이벤트로 마지막 해제 판단",releaseCommands.Last()==SwitchCommand.Commit);
+        BeginReleaseCase();Key(0x27,true,true);Key(0x1B,true,true);Key(0x1B,false,true);Key(0xA4,false);Key(0x27,false);
+        Check("Esc 취소 후 남은 키를 놓아도 전환하지 않음",releaseCommands.Last()==SwitchCommand.Cancel&&!releaseCommands.Contains(SwitchCommand.Commit));
+        BeginReleaseCase();Key(0x0D,true,true);Key(0xA4,false);
+        Check("묶음 진입 Enter를 잡고 있으면 기다림",!releaseCommands.Contains(SwitchCommand.Commit));Key(0x0D,false);
+        Check("Enter까지 모두 놓으면 확정",releaseCommands.Last()==SwitchCommand.Commit);
+        releaseCommands.Clear();releaseRouter=new ShortcutRouter(releaseCommands.Add);Key(0x27,true);Key(0xA4,true);Key(9,true,true);Key(9,false,true);Key(0xA4,false);
+        Check("AltTab 전에 누른 화살표도 마지막 해제까지 기다림",!releaseCommands.Contains(SwitchCommand.Commit));Key(0x27,false);
+        Check("시작 전에 누른 화살표 해제도 확정",releaseCommands.Last()==SwitchCommand.Commit);
         foreach(var viewport in new[]{new Size(4048,2048),new Size(1872,976),new Size(1318,704)}){
             foreach(int count in new[]{17,22}){
                 var layout=LayoutPlanner.Plan(count,viewport.Width,viewport.Height,false);
@@ -270,22 +303,40 @@ internal static class SelfTests
         using(var navigationCatalog=new CatalogService()) {
             foreach(string mode in new[]{"목록","카드","아이콘"}) {
                 nint activated=0;
-                var navigationPrefs=new Preferences{View=mode};
-                var form=new SwitcherForm(navigationPrefs,navigationCatalog,h=>{activated=h;return true;});
+                var navigationPrefs=new Preferences{View=mode,HighlightTarget=false,EmphasizeTarget=false,PeekTarget=false};
+                var form=new SwitcherForm(navigationPrefs,navigationCatalog,h=>{activated=h;return true;}){InspectionMode=true};
                 try {
                     var navigationRows=Enumerable.Range(1,4).Select(i=>Row(100+i,"chrome","Chrome 창 "+i,i)).Append(Row(200,"EXCEL","경제.xlsx",5)).ToList();
                     form.PrepareNavigationTest(navigationRows);form.TestKey(Keys.Tab);
                     Check(mode+" Tab 반복은 빠른 전환 유지",!form.NavigationState.Persistent);
                     form.TestKey(Keys.Up);
-                    Check(mode+" 방향키를 누르면 상세 모드 전환",form.NavigationState.Persistent);
+                    Check(mode+" 방향키 이동 후에도 전체 키 해제 확정 유지",!form.NavigationState.Persistent);
                     form.PrepareNavigationTest(navigationRows);form.TestKey(Keys.Enter);
                     Check(mode+" Enter로 4개 Chrome 창 진입",form.NavigationState.Group!=null&&form.NavigationState.Count==4&&activated==0);
-                    Check(mode+" 진입 후 Alt 해제에도 화면 유지",form.NavigationState.Persistent);
+                    Check(mode+" 묶음 진입도 전체 키 해제 확정 유지",!form.NavigationState.Persistent);
                     form.TestKey(Keys.Back);
                     Check(mode+" Backspace로 전체 목록 복귀",form.NavigationState.Group==null&&form.NavigationState.Count==2&&form.NavigationState.Selected==101);
                     form.TestKey(Keys.Enter);form.TestKey(Keys.Tab);form.TestKey(Keys.Enter);
                     Check(mode+" 두 번째 Enter로 선택한 개별 창 전환",activated==102);
                     Check(mode+" 닫은 뒤 상세 모드 초기화",!form.NavigationState.Persistent);
+                    activated=0;form.PrepareNavigationTest(navigationRows);form.Show();
+                    var formRouter=new ShortcutRouter(command=>{
+                        if(command==SwitchCommand.Up)form.DetailedNavigate(Keys.Up);
+                        if(command==SwitchCommand.Down)form.DetailedNavigate(Keys.Down);
+                        if(command==SwitchCommand.Commit)form.NavigationReleased();
+                    });
+                    formRouter.Route(9,true,true,false,false,true);formRouter.Route(9,false,true,false,false,true);
+                    formRouter.Route(0x28,true,true,false,false,true);formRouter.Route(0x28,false,true,false,false,true);
+                    formRouter.Route(0x26,true,true,false,false,true);formRouter.Route(0xA4,false,false,false,false,true);
+                    Check(mode+" 실제 폼에서 Alt를 먼저 놓고 화살표를 잡으면 유지",form.Visible&&activated==0);
+                    nint highlighted=form.NavigationState.Selected;
+                    formRouter.Route(0x26,false,false,false,false,true);
+                    Check(mode+" 마지막 화살표 해제로 Chrome 대표 창 전환 후 닫힘",highlighted==101&&activated==highlighted&&!form.Visible);
+                    activated=0;form.PrepareNavigationTest(navigationRows);form.Show();form.TestKey(Keys.Enter);form.TestKey(Keys.Tab);
+                    form.NavigationReleased();
+                    Check(mode+" 펼친 Chrome 목록에서는 하이라이트한 개별 창으로 전환",activated==102&&!form.Visible);
+                    activated=0;form.PrepareNavigationTest(navigationRows,true);form.Show();form.DetailedNavigate(Keys.Down);form.NavigationReleased();
+                    Check(mode+" 명시적 고정 모드에서는 키 해제 후에도 화면 유지",form.Visible&&form.IsPersistent&&activated==0);form.Dismiss(false);
                 } finally {form.Shutdown();}
             }
         }

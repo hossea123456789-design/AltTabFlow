@@ -42,7 +42,7 @@ internal sealed class SettingsForm : Form
         monitor.Checked=prefs.CurrentMonitorOnly;primary.Checked=prefs.OnPrimaryMonitor;startup.Checked=prefs.AutoStartByDefault;
         var checks=new[]{replace,grouped,preview,primary,monitor,startup};
         for(int i=0;i<checks.Length;i++)Place(general,checks[i],16,72+i*42,548,32);
-        LabelAt(general,"Alt를 누른 채 Tab 반복 → 선택 이동 · Alt를 놓으면 전환\n방향키 / 묶음 진입 / 검색 → Enter 또는 Esc까지 화면 유지\n\n자동 실행은 기본으로 켜져 있으며, 해제한 선택은 유지됩니다.",16,340,550,116);
+        LabelAt(general,"Alt+Tab → Tab·방향키로 이동 → 키를 모두 놓으면 전환\n여러 창이 묶인 앱은 하이라이트에 표시된 첫 창으로 전환\nCtrl+Alt+Space / Ctrl+Alt+Tab → 화면을 유지하는 상세 선택\n자동 실행은 기본 켜짐이며, 해제한 선택은 유지됩니다.",16,340,550,116);
         LabelAt(ordering,"체크한 앱이 먼저 표시됩니다.",16,16,550);
         LabelAt(ordering,"상단 등록 앱: A~Z → 가나다순\n나머지 앱: A~Z → 가나다순 · 등록한 순서와 무관합니다.",16,48,550,52);
         foreach(var w in windows.GroupBy(x=>x.ProcessName,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()))choices.Add(new(w.ProcessName,w.AppName));
