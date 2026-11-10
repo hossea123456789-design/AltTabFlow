@@ -6,7 +6,8 @@
 
 - 저장소: [hossea123456789-design/AltTabFlow](https://github.com/hossea123456789-design/AltTabFlow) (**Private**)
 - 기본 브랜치: `main`; 변경은 `update/vX.Y.Z-...` 브랜치와 Pull Request로 진행.
-- **현재 `main`: 1.1.10**, [PR #8](https://github.com/hossea123456789-design/AltTabFlow/pull/8)을 [Windows 성공 CI #42832500112](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 이후 [커밋 0841c00](https://github.com/hossea123456789-design/AltTabFlow/commit/0841c00da08fa5287e971197894dfd2987b4ac14)로 병합했습니다. SHA-256·컴파일·단일 EXE·기본206/UI80/업데이터11/관리자 시작11 = **308개 CI 검사 성공**, 실제 메인·설정·업데이트 창 캡처 및 ZIP 업로드 성공.
+- **1.1.11 업데이트 브랜치:** `feature/v1.1.11-public-binary-updates`에서 공개 바이너리 자동 업데이트(토큰 삭제) 및 Alt+Enter 메이플 전체화면 Z-order/포커스 재진입 문제 수정 중. `main` 병합 및 최신 CI 상태 확인 필요.
+- **직전 `main`: 1.1.10**, [PR #8](https://github.com/hossea123456789-design/AltTabFlow/pull/8)을 [Windows 성공 CI #42832500112](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 이후 [커밋 0841c00](https://github.com/hossea123456789-design/AltTabFlow/commit/0841c00da08fa5287e971197894dfd2987b4ac14)로 병합했습니다. SHA-256·컴파일·단일 EXE·기본206/UI80/업데이터11/관리자 시작11 = **308개 CI 검사 성공**, 실제 메인·설정·업데이트 창 캡처 및 ZIP 업로드 성공.
 - **1.1.9 과거 기준:** 1.1.9, [PR #7](https://github.com/hossea123456789-design/AltTabFlow/pull/7)을 [Windows 성공 CI #42812687675](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42812687675) 이후 [커밋 51175f3](https://github.com/hossea123456789-design/AltTabFlow/commit/51175f30dd9c0e0aa8792593e3956703f7f24e8d)로 병합했습니다. 체크섬·컴파일·단일 EXE 게시·기본 206/206·UI 71/71·Updater 11/11·실제 메인/설정 캡처 및 동일 폴더 배포 후보 업로드까지 성공했습니다.
 - **직전 기준 버전 `main`: 1.1.8**, 소스 병합 커밋 [`8fca819`](https://github.com/hossea123456789-design/AltTabFlow/commit/8fca8193761bca80812b20c188350d7e4165f34f) ([PR #6](https://github.com/hossea123456789-design/AltTabFlow/pull/6)). 새 세션에서는 최신 `main` HEAD와 PR/Actions를 다시 확인하세요.
 - **1.1.8 변경:** 일반 Alt+Tab 종료 누락 복구, 16ms 활성 세션 복구 타이머, 오래된 키 기록 정리, 이전 고정 UI 재시작 상태 초기화. [PR #6 Windows CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42792830910)에서 SHA-256·.NET 컴파일·단일 EXE·기본 206개·UI 71개·메인/설정 스크린샷 성공.
@@ -42,6 +43,16 @@
 - **P4 및 소유 팝업:** 실제로 클릭한 전경 창과 소유 관계를 고려해 MRU 왕복. 실제 전경 활성화 성공을 확인한 뒤 전환기 종료.
 - **1.1.6 UI:** 좌측 메뉴/설정 카드/하단 저장, 7종 테마, 모니터·크기·보기·제외 목록; 미리보기·취소는 원본 설정 파일을 변경하지 않음.
 - **1.1.7 설정:** 숨길 앱 입력창 Enter는 줄바꿈; 수동 상단 등록 앱 이름 입력 Enter는 등록. 상단 등록 앱 행에는 체크+실제 아이콘+앱/프로세스 이름, 아이콘 없으면 글자 배지.
+
+## 1.1.11: 메이플 전체화면/포커스와 공개 바이너리
+
+- 사용자 증상: 메이플에서 `Alt+Enter`로 화면을 확장하면 게임이 화면·포커스를 점유, AltTabFlow 선택 UI는 뒤에 가려지고 다른 앱 선택 뒤에도 Maple이 남아 있음.
+- 코드 조사: 이전 `SwitcherForm.Deactivate`는 게임이 원래 전경을 되찾으면 화면을 즉시 `Dismiss(false)`했음. `SwitcherForm.Choose`는 대상 HWND의 진짜 활성화 이전에 `TargetPeek.Accept/Restore`를 실행, 전환을 위한 임시 Z-order를 조기 해제. `Native.Activate`는 `SetForegroundWindow`의 bool을 실제 활성화로 신뢰하고, `WindowActivation` 250ms·`SwitcherForm` 250ms에서 전환 확인을 끝냈음.
+- 개선: AltTabFlow 선택 UI에 `HWND_TOPMOST`를 비활성화 없이 재적용, 게임 원래 창이 전경을 되찾으면 선택 UI를 즉시 종료하지 않음. 실제 foreground 확인과 bounded 850/900ms 활성화 재시도. 전환 대상의 `peek` Z-order는 실제 활성화 확인 뒤 복원. 원래 게임 창 강제 최소화/TopMost 영구 변경 금지.
+- **독점 전체화면 한계:** DirectX exclusive fullscreen 또는 게임 보호 기능에서는 일반 TopMost 오버레이/전경 활성화 보장이 불가능. 사용자 PC의 게임 전체화면 창 모드 vs 독점 전체화면을 구분해 실험.
+- 배포: `AltTabFlow` 소스 저장소 PRIVATE 유지. 실행 파일만 `AltTabFlow-Downloads` PUBLIC Release(프리릴리스, ZIP+SHA256SUMS)로 배포. 클라이언트 인증 UI/PAT 저장·비공개 Actions 조회 제거, 공개 Releases API에서 버전·digest 검증 후 업그레이드.
+- 한 번 필요한 외부 설정: **PUBLIC `AltTabFlow-Downloads` 저장소 생성** 및 PRIVATE 소스 repo Actions Secret `ALTTABFLOW_PUBLIC_RELEASE_TOKEN`(대상 공개 저장소 Contents:RW 범위만). 현재 GitHub 커넥터가 저장소 생성과 Secrets 편집을 제공하지 않으므로 자동화 워크플로는 등록하되 배포가 **실제로 공개됐다고 말하지 않음**.
+- 자동 검사 목표: 기본206 + UI85(+5 game overlay) + 업데이트22(+11 public releases) + 관리자 시작11 = **324개**. 물리 메이플/P4·전경/Peek·실제 공개 다운로드 및 Windows 자동 교체는 별도 검증.
 
 ## 1.1.10 사용자 보고 버그·후속 개발
 

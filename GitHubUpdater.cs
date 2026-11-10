@@ -119,7 +119,8 @@ internal static class GitHubUpdater
             if(!Version.TryParse(tag[1..],out Version? version))return false;
             foreach(var asset in release.GetProperty("assets").EnumerateArray()){
                 if(asset.GetProperty("name").GetString()!=ReleaseAsset)continue;
-                string digest=asset.GetProperty("digest").GetString()??"";
+                string digest=asset.TryGetProperty("digest",out var d)&&d.ValueKind==JsonValueKind.String
+                    ?d.GetString()??"":"";
                 if(!Regex.IsMatch(digest,@"^sha256:[a-fA-F0-9]{64}$",RegexOptions.CultureInvariant))return false;
                 string uri=asset.GetProperty("browser_download_url").GetString()??"";
                 if(!Uri.TryCreate(uri,UriKind.Absolute,out var address)||!IsReleaseAssetUrl(address,tag))return false;
