@@ -4,14 +4,14 @@
 
 | 검사 | CLI | 1.1.8 기대 수 | CI 자동화 | 실제 Windows 사용자 세션 |
 |---|---|---:|---|---|
-| 기본 키 입력·그룹·고정 세션 | `--self-test` | **206** | 이번 1.1.8 PR의 Windows CI 결과 확인 필요 | 별도 재검증 |
-| UI·줄바꿈·아이콘·접근성 | `--ui-self-test` | **71** | ✅ [PR #5 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155) 성공 | 별도 재검증 |
+| 기본 키 입력·그룹·고정 세션 | `--self-test` | **206** | ✅ [PR #6 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42792830910) 206/206 성공 | 별도 재검증 |
+| UI·줄바꿈·아이콘·접근성 | `--ui-self-test` | **71** | ✅ [PR #6 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42792830910) 71/71 성공 | 별도 재검증 |
 | 실제 창 미리 표시/취소 | `--peek-self-test` | **10** | 무인 CI에서 보장 불가 | 필요 |
 | 우클릭 메뉴 생명주기 | `--menu-self-test` | **7** | 무인 CI에서 보장 불가 | 필요 |
 | 전경 권한·지연된 대상 | `--focus-self-test` | **18** | 무인 CI에서 보장 불가 | 필요; Peek 10개와 중복 |
-| **고유 합계** | | **302** | 기본+UI=277개 자동화 목표 | 나머지 고유 25개 및 물리 입력 필요 |
+| **고유 합계** | | **302** | 기본+UI=277개 이번 CI 통과 | 나머지 고유 25개 및 물리 입력 필요 |
 
-위 302개는 **업로드된 1.1.7 명세가 보고한 결과**이며 CI가 자동으로 302개를 재실행했다고 주장하지 않습니다. 정확한 통과 여부는 각 실행의 JSON `failures`, `tests[].passed`, 종료 코드와 Action 결론을 확인하세요.
+위 302개는 **업로드된 1.1.8 명세가 보고한 결과**이며 CI가 자동으로 302개를 재실행했다고 주장하지 않습니다. 정확한 통과 여부는 각 실행의 JSON `failures`, `tests[].passed`, 종료 코드와 Action 결론을 확인하세요.
 
 ## 실제 장치 점검 시나리오
 
@@ -43,7 +43,7 @@ dotnet build .\AltTabFlow.csproj -c Release
 
 ## 자동 CI의 한계
 
-- **이전 버전 확인:** [1.1.7 PR #5 Windows CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155)에서 SHA-256 manifest, .NET 컴파일, self-contained EXE, 기본 161/161, UI 71/71 및 화면 캡처 성공. **1.1.8에서는 새 기본 206/206과 UI 71/71 CI 결과를 다시 확인해야 함.**
+- **1.1.8 PR CI 확인 완료:** [Windows CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42792830910)에서 SHA-256 manifest, .NET 컴파일, self-contained EXE, 기본 206/206, UI 71/71, 실제 메인·설정 WinForms 화면 캡처 성공.
 - CI 스크린샷은 실제 WinForms 화면이지만 메이플스토리·P4 프로그램이 설치되어 있다는 뜻이 아님.
 - 302개 전체 실기기 확인 전에는 CI 후보 ZIP을 정식 사용자 검증 릴리스로 승격하지 않음.
 - 빌드 아티팩트는 만료될 수 있음. 장기 추적의 진실 공급원은 **Git commit + PR + 테스트 체크리스트**. 검증 완료된 릴리스만 GitHub Release에 등록.

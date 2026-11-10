@@ -6,7 +6,8 @@
 
 - 저장소: [hossea123456789-design/AltTabFlow](https://github.com/hossea123456789-design/AltTabFlow) (**Private**)
 - 기본 브랜치: `main`; 변경은 `update/vX.Y.Z-...` 브랜치와 Pull Request로 진행.
-- **업데이트 기준:** 1.1.7 `main` 커밋 `a5ae270`. **1.1.8은 업데이트 브랜치 `update/v1.1.8-missed-keyup-commit`에서 검증 중**입니다. 다음 세션에서는 최신 `main`과 PR을 조회해 병합 여부 및 확정 커밋부터 다시 확인하세요.
+- **현재 `main`: 1.1.8**, 소스 병합 커밋 [`8fca819`](https://github.com/hossea123456789-design/AltTabFlow/commit/8fca8193761bca80812b20c188350d7e4165f34f) ([PR #6](https://github.com/hossea123456789-design/AltTabFlow/pull/6)). 새 세션에서는 최신 `main` HEAD와 PR/Actions를 다시 확인하세요.
+- **1.1.8 변경:** 일반 Alt+Tab 종료 누락 복구, 16ms 활성 세션 복구 타이머, 오래된 키 기록 정리, 이전 고정 UI 재시작 상태 초기화. [PR #6 Windows CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42792830910)에서 SHA-256·.NET 컴파일·단일 EXE·기본 206개·UI 71개·메인/설정 스크린샷 성공.
 - **1.1.7 변경:** 9개 소스 파일 변경, 전체 인계 문서 추가, 줄바꿈 정책·SHA-256 검증 자동화. [Windows PR CI #42777258155](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155)에서 체크섬·컴파일·EXE 게시·기본 161개·UI 71개·실제 WinForms 메인/설정 화면 캡처 성공. 새 세션에서는 최신 `main`/PR/Actions를 다시 확인.
 - 주 이슈: [#1 실사용 검증 체크리스트](https://github.com/hossea123456789-design/AltTabFlow/issues/1).
 - 상세 기록: [개발 이력](DEVELOPMENT_HISTORY.md), [변경 불가 동작 계약](ARCHITECTURE_AND_INVARIANTS.md), [검증 매트릭스](TEST_MATRIX.md), [1.1.8 원문 변경 명세](specs/AltTabFlow_1.1.8_갱신내용.md).
@@ -46,7 +47,7 @@
 - 해결: 훅이 놓친 이전 key-up 기록(knownDown)을 실제 Windows 눌림 상태와 대조해 정리하고, 입력 세션이 살아 있을 때에만 훅 스레드 16ms WM_TIMER로 해제 여부를 보조 확인합니다. **가로챈 Tab·방향키 등은 async 0으로 놓였다고 단정하지 않습니다.**
 - 고정 모드 Ctrl+Alt+Tab은 키를 놓아도 유지하되, **그 뒤 새 일반 Alt+Tab은 일반 모드로 전환**해 마지막 키 해제 시 닫습니다.
 - 원본 1.1.8 명세: **기본 206 + UI 71 + Peek 10 + 메뉴 7 + Focus 18(중복10) = 고유 302개** 통과 기록. 명세 작성자가 실제 사용자 입력에서 일반 2~3회와 고정 조합 정상 동작을 확인했다고 기재했습니다. 이 별도 Windows 환경의 사실을 GitHub CI/현재 세션 실기기 통과와 섞지 마세요.
-- 최신 CI에서 **기본 206/206 + UI 71/71**가 성공했는지 확인한 뒤 PR을 병합하세요. 다른 고유 25개 및 실제 관리자 게임·P4 테스트는 별도로 관리합니다.
+- **이번 GitHub CI에서 기본 206/206 + UI 71/71 성공을 확인하고 PR #6을 `main`에 병합**했습니다. [CI 기록](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42792830910). 나머지 고유 25개 및 실제 관리자 게임·P4 입력은 별도 검증 대상으로 유지합니다.
 
 ## 과거 1.1.7 검증 범위와 주의
 
