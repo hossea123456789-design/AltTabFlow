@@ -139,7 +139,7 @@ jobs:
           $exe = Get-Item 'artifacts\package\AltTabFlow\AltTabFlow.exe'
           $version = $exe.VersionInfo.ProductVersion
           Write-Host "Candidate product version: $version"
-          if ($version -notmatch '^1\.1\.9(?:\.|$)') { throw "Expected version 1.1.9, got $version" }
+          if ($version -notmatch '^1\.1\.9(?:[.+]|$)') { throw "Expected version 1.1.9, got $version" }
           foreach ($name in @('AltTabFlow.exe','Run-GameCompat.ps1','Game-compat-mode.cmd')) {
             if (!(Test-Path (Join-Path 'artifacts\package\AltTabFlow' $name))) { throw "Missing $name" }
           }
