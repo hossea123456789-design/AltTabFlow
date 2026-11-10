@@ -35,6 +35,9 @@ internal sealed class SwitcherForm : Form
     private readonly System.Windows.Forms.Timer refreshUi = new() { Interval = 100 };
     private readonly System.Windows.Forms.Timer visualTimer = new() { Interval = 16 };
     private readonly System.Windows.Forms.Timer commitTimer = new() { Interval = 10 };
+    // Used only while the switcher is visible. It does not fight Windows
+    // foreground focus for unrelated apps after the user switches away.
+    private const int CommitDeadlineMs=900;
     private readonly bool nativeActivation;
     private bool committing, presenting, requestAccepted;
     private nint commitTarget;
@@ -96,7 +99,16 @@ internal sealed class SwitcherForm : Form
         Deactivate += (_, _) => {
             if(forceExit||presenting)return;
             if(committing){CheckCommit();return;}
-            if (Visible && !configuring && !InspectionMode) Dismiss(false);
+            if(!Visible||configuring||InspectionMode)return;
+            // A maximized game may immediately reclaim foreground after
+            // Show(). Don't close the switcher and lose the user's key-up.
+            if(WindowIdentity.Same(Native.GetForegroundWindow(),origin)){
+                BeginInvoke((Action)(()=>{
+                    if(Visible&&!committing&&!configuring)ReassertOverlayZOrder();
+                }));
+                return;
+            }
+            Dismiss(false);
         };
         visualTimer.Tick+=(_,_)=>{visualTimer.Stop();if(!committing)ApplyTargetVisuals();};
         commitTimer.Tick+=(_,_)=>CheckCommit();
@@ -107,6 +119,9 @@ internal sealed class SwitcherForm : Form
             if(entries.Count>0)MoveSelection(e.Delta>0?-1:1);
         };
         refreshUi.Tick += (_, _) => {
+            if(Visible&&!configuring&&!committing&&!InspectionMode&&
+               WindowIdentity.Same(Native.GetForegroundWindow(),origin))
+                ReassertOverlayZOrder();
             if (!Visible || configuring || !catalogDirty) return;
             catalogDirty = false;
             // Refresh membership/title without reordering a selection while the user navigates.
@@ -118,6 +133,15 @@ internal sealed class SwitcherForm : Form
         catalog.Updated += OnCatalogUpdated;
     }
     private void OnCatalogUpdated() { catalogDirty = true; }
+    internal static bool ShouldKeepOverlayOnGameFocus(nint foreground,nint origin)
+        =>foreground!=0&&origin!=0&&WindowIdentity.Same(foreground,origin);
+    private void ReassertOverlayZOrder(){
+        if(!Visible||IsDisposed||InspectionMode)return;
+        // HWND_TOPMOST: remain above the game's topmost band while the
+        // switcher is visible. SWP_NOACTIVATE avoids focus stealing loops.
+        const uint flags=0x0001|0x0002|0x0010|0x0040;
+        Native.SetWindowPos(Handle,(nint)(-1),0,0,0,0,flags);
+    }
     protected override CreateParams CreateParams { get { var p = base.CreateParams; if(!InspectionMode)p.ExStyle |= 0x80; return p; } }
     protected override void OnHandleCreated(EventArgs e) {
         base.OnHandleCreated(e);
@@ -140,12 +164,12 @@ internal sealed class SwitcherForm : Form
         if(committing)return;
         // Each Alt+Tab gesture selects its own lifetime. A previously pinned UI
         // must not prevent a new plain gesture from committing on key release.
-        if (Visible) { persistent = pinned; releaseTimestamp=0;if(!pinned)ActiveControl=null;activation.Request(Handle); MoveSelection(direction); return; }
+        if (Visible) { persistent = pinned; releaseTimestamp=0;if(!pinned)ActiveControl=null;ReassertOverlayZOrder();activation.Request(Handle); MoveSelection(direction); return; }
         opening = Stopwatch.StartNew();
         PrepareSwitcher(pinned,direction,sameApp);
         ApplyBounds();EnsurePage(); ApplyTheme();
         presenting=true;
-        try{Show(); Native.ShowWindow(Handle,5); activation.Request(Handle);}
+        try{Show(); Native.ShowWindow(Handle,5); ReassertOverlayZOrder(); activation.Request(Handle);}
         finally{presenting=false;}
         if (pinned) search.Focus(); else ActiveControl = null;
         refreshUi.Start();Invalidate();catalog.RefreshSoon();
@@ -238,8 +262,10 @@ internal sealed class SwitcherForm : Form
         var target = entries[selected].Window;
         committing=true;commitTarget=target.Handle;commitStarted=Stopwatch.GetTimestamp();
         requestAccepted=false;
-        peek.Accept();
-        HideTargetVisuals();
+        // Leave the preview band's temporary ordering in place until the
+        // chosen HWND is REALLY foreground. Otherwise a topmost game is
+        // restored over the target before the activation request finishes.
+        visualTimer.Stop();aura.Hide();dimmer.Hide();
         bool success=activateTarget(target.Handle);
         requestAccepted=success;
         if(!committing)return; // Deactivate can confirm synchronously.
@@ -252,12 +278,14 @@ internal sealed class SwitcherForm : Form
         if(WindowIdentity.Same(foreground,commitTarget)){FinishCommit(true);return;}
         Native.GetWindowThreadProcessId(foreground,out uint pid);
         bool external=foreground!=0&&pid!=Environment.ProcessId&&!WindowIdentity.Same(foreground,origin);
-        if(external||!Native.IsWindow(commitTarget)||Stopwatch.GetElapsedTime(commitStarted).TotalMilliseconds>=250){FinishCommit(false);return;}
+        if(external||!Native.IsWindow(commitTarget)||Stopwatch.GetElapsedTime(commitStarted).TotalMilliseconds>=CommitDeadlineMs){FinishCommit(false);return;}
         if(!requestAccepted)requestAccepted=activateTarget(commitTarget);
     }
     private void FinishCommit(bool confirmed) {
         if(!committing)return;
         var data=new {hwnd=commitTarget.ToInt64(),origin=origin.ToInt64(),foreground=Native.GetForegroundWindow().ToInt64(),inputMs=InputTimestamp>0?Math.Round(Stopwatch.GetElapsedTime(InputTimestamp).TotalMilliseconds,2):0,releaseToSwitchMs=releaseTimestamp>0?Math.Round(Stopwatch.GetElapsedTime(releaseTimestamp).TotalMilliseconds,2):0,requestToSwitchMs=Math.Round(Stopwatch.GetElapsedTime(commitStarted).TotalMilliseconds,2)};
+        // Confirm before demoting the temporary game/topmost preview band.
+        if(confirmed)peek.Accept();else peek.Restore();
         if(confirmed&&nativeActivation)TrackForeground(Native.GetForegroundWindow());
         Dismiss(false);
         AppLog.Write(confirmed?"activated":"activate-unconfirmed",data);
