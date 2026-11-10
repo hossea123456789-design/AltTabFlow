@@ -21,7 +21,7 @@ gh release create v1.1.10 '.\releases\AltTabFlow-latest-win-x64.zip' --title 'Al
 
 1. 저장소 소유자가 기존 `hossea123456789-design/AltTabFlow`의 과거 커밋·Issues/Actions 로그를 검토하고 **Public**으로 전환합니다. 연결된 GitHub App에서는 Admin 권한이 없어 visibility를 변경할 수 없습니다.
 2. 기존 소스 저장소 하나만 사용합니다. `AltTabFlow-Downloads` 생성이나 PAT 발급, 별도 Secret 등록은 **필요하지 않습니다**.
-3. Private 상태에서는 `publish-public-binaries.yml`가 실제 릴리스를 게시하지 않도록 막습니다. Public 전환 후 Actions → **Publish AltTabFlow Release (same public repository)** → Run workflow를 실행하거나 다음 main Windows CI 성공을 사용합니다.
+3. Private 상태에서는 `publish-public-binaries.yml`가 실제 릴리스를 게시하지 않도록 막습니다. Private → Public 전환 순간 GitHub `public` 이벤트로 릴리스 배포 작업이 자동 실행됩니다. 별도 Actions 수동 실행은 필요하지 않습니다(필요시 재시도용 workflow_dispatch 제공).
 4. 워크플로가 `main`의 정확한 HEAD 커밋과 같은 성공 Windows CI를 선택하고 `AltTabFlow-win-x64.zip`, `SHA256SUMS.txt`만 릴리스 자산으로 올리는지 확인합니다. GitHub의 자동 Source code 링크는 저장소가 이미 Public이므로 별개입니다.
 5. 앱에서는 GitHub 토큰 없이 동일 저장소 공개 Releases API의 최신 유효 버전, SHA-256 digest, ZIP 내 EXE 버전을 검사해 자동 교체·재시작합니다.
 6. CI 검사는 입력206/UI85/업데이터22/관리자 시작11=324건. 실제 메이플 독점 전체화면, UAC, 파일 교체 종단간 및 공개 릴리스 조회는 별도로 확인하고 정식 검증 완료로 과장하지 않습니다.

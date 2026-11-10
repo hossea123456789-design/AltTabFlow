@@ -18,7 +18,7 @@ Alt+Enter로 확장된 메이플스토리가 최대화 또는 전체화면 상�
 
 설정 → 업데이트 확인으로 **같은 공개 GitHub 저장소**의 Releases에서 새로운 Windows EXE를 받습니다. 사용자 GitHub 로그인/PAT는 요구하지 않습니다. 자동 배포는 성공한 Windows CI와 같은 `main` SHA의 실행 파일만 사용하고, `GITHUB_TOKEN`으로 공개 프리릴리스를 생성합니다. 앱은 업로드된 ZIP의 SHA-256과 EXE 버전을 검증하고 재시작합니다.
 
-**최초 공개 전환:** GitHub 관리 권한 보유자가 저장소 Settings → General → Danger Zone → Change repository visibility → Public을 한 번 승인해야 합니다. 자동 배포 워크플로는 Private 상태에서 릴리스를 만들지 않으며, Public 전환 후 Actions → Publish AltTabFlow Release → Run workflow를 한 번 실행하면 됩니다. 저장소 공개는 과거 커밋·이슈·로그까지 공개될 수 있어 사전 점검이 필요합니다.
+**최초 공개 전환:** GitHub 관리 권한 보유자가 저장소 Settings → General → Danger Zone → Change repository visibility → Public을 한 번 승인해야 합니다. 자동 배포 워크플로는 Private 상태에서 릴리스를 만들지 않으며, Public으로 전환하면 GitHub의 `public` 이벤트가 배포 작업을 자동 실행합니다. 별도 Actions 수동 실행은 필요하지 않습니다. 저장소 공개는 과거 커밋·이슈·로그까지 공개될 수 있어 사전 점검이 필요합니다.
 
 ## 주요 기능
 
