@@ -30,12 +30,15 @@ internal static class Program
         Directory.CreateDirectory(Preferences.DataDirectory);
         AppLog.Suppressed=args.Any(x=>x.EndsWith("self-test",StringComparison.Ordinal)||x.EndsWith("fixture",StringComparison.Ordinal));
         if(args.Contains("--updater-self-test")) { UpdaterTests.Run(); return; }
+        if(args.Contains("--startup-self-test")) { StartupTests.Run(); return; }
+        if(args.Length>0&&args[0]=="--startup-task") { Environment.ExitCode=ElevatedStartup.RunHelper(args);return; }
         if(args.Length>0&&args[0]=="--apply-update") { UpdateInstaller.Run(args); return; }
         if(args.Contains("--self-test")) { SelfTests.Run(); return; }
         if(args.Contains("--peek-self-test")) { PeekTests.Run(); return; }
         if(args.Contains("--focus-self-test")) { PeekTests.Run(true); return; }
         if(args.Contains("--menu-self-test")) { MenuTests.Run(); return; }
         if(args.Contains("--ui-self-test")) { UiTests.Run(); return; }
+        if(args.Contains("--update-preview")){using var updater=new UpdateWindow(()=>{});updater.Show();Application.Run(updater);return;}
         if(args.Contains("--ui-preview")){using var preview=new SettingsForm(Preferences.Load(),Array.Empty<WindowInfo>()){PreviewOnly=true};preview.TestPage(2);preview.Show();Native.ShowWindow(preview.Handle,5);Application.Run(preview);return;}
         if(args.Length==2&&args[0]=="--peek-fixture") { PeekTests.RunFixture(args[1]); return; }
         if(args.Length==2&&args[0]=="--focus-fixture") { PeekTests.RunFocusFixture(args[1]); return; }
@@ -80,7 +83,11 @@ internal sealed class SwitcherContext : ApplicationContext
     private readonly ToolStripMenuItem pauseMenu;
     private readonly System.Windows.Forms.Timer startupTimer=new(){Interval=350};
     public SwitcherContext(string[] args) {
-        try { Preferences.StartupEnabled=prefs.AutoStartByDefault; prefs.StartWithWindows=prefs.AutoStartByDefault; prefs.Save(); }
+        try {
+            Preferences.StartupEnabled=ElevatedStartup.UseRegistryRun(prefs.AutoStartByDefault,prefs.ElevatedStartup);
+            prefs.StartWithWindows=prefs.AutoStartByDefault;
+            prefs.Save();
+        }
         catch(Exception ex){AppLog.Write("startup-registration-failed",new{ex.Message});}
         form=new(prefs,catalog);
         if(args.Contains("--preview")||args.Contains("--inspect")) { form.InspectionMode=true; form.ShowInTaskbar=true; }
@@ -92,7 +99,7 @@ internal sealed class SwitcherContext : ApplicationContext
         var menu=new ContextMenuStrip();
         menu.Items.Add("AltTabFlow 열기    Ctrl+Alt+Space",null,(_,_)=>form.OpenSwitcher(true,0));
         menu.Items.Add("설정",null,(_,_)=> { if(!form.Visible)form.OpenSwitcher(true,0); form.ShowSettings(); });
-        menu.Items.Add("업데이트 확인",null,async (_,_)=>await GitHubUpdater.CheckAndInstallAsync(form,Exit));
+        menu.Items.Add("업데이트 확인",null,(_,_)=>GitHubUpdater.ShowWindow(Exit));
         menu.Items.Add(GameCompatibility.IsElevated?"게임 호환 관리자 모드: 켜짐":"게임 호환: 관리자 권한으로 다시 시작",null,(_,_)=>GameCompatibility.RequestElevatedRestart(form));
         pauseMenu=new ToolStripMenuItem("Alt+Tab 대체 일시 중지",null,(_,_)=>TogglePause()); menu.Items.Add(pauseMenu);
         menu.Items.Add(new ToolStripSeparator());

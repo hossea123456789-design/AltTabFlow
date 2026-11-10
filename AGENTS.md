@@ -19,6 +19,9 @@ Before editing code in any new session, read and respect these repository-owned 
 - Maintain `.gitattributes` LF source policy and validate `SOURCE-SHA256.txt` on updates.
 - v1.1.9: in-app update fetches only latest successful main GitHub Actions candidate, verifying ZIP SHA-256 and executable version; private repo PAT (Contents/Actions:read) goes to Windows Credential Manager, never settings/logs. Updater helper replaces EXE only after old process exits.
 - v1.1.9: game mode UAC must be approved before the original process is told to quit; token takeover across ordinary/elevated singleton must be tested on a real Windows PC. Candidate archive must keep EXE/game scripts in a single folder.
+- v1.1.10: interactive elevated logon task runs only from the protected Program Files AltTabFlow installation; never point an elevated scheduled task at Downloads/AppData/other user-writable EXE. Task uses current user interactive token, highest level, and never coexists with HKCU Run autostart. UAC cancellation must preserve settings.
+- v1.1.10: persistent UpdateWindow must stay visible in front of topmost Settings/Switcher; no transient PromptToken. Network cancellation must not update or exit. Successful handoff is the only path allowing update dialog to close while busy.
+- v1.1.10: MouseWheel ONLY navigates. Do not set persistent=true for ordinary Alt+Tab wheel. Commit on last key release; explicit pinned mode remains pinned.
 - No unverified production `v1.1.x` release or tag. Candidate EXEs and screenshots are not proof of all native tests.
 - Do not commit `settings.json`, user window titles, process paths, private diagnostic logs, account secrets or personal machine configuration.
 
