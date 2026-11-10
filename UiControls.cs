@@ -96,7 +96,8 @@ internal sealed class FlowAppList : ListBox
     public ThemePalette Palette {get;set;}=ThemePalette.All[0];private readonly HashSet<object> checks=new();
     public event EventHandler? ChecksChanged;
     public IEnumerable<object> CheckedItems=>Items.Cast<object>().Where(checks.Contains);
-    public FlowAppList(){DrawMode=DrawMode.OwnerDrawFixed;BorderStyle=BorderStyle.None;IntegralHeight=false;ItemHeight=40;AccessibleName="상단 정렬 앱 · Space로 등록 또는 해제";}
+    private Font? processFont;
+    public FlowAppList(){DrawMode=DrawMode.OwnerDrawFixed;BorderStyle=BorderStyle.None;IntegralHeight=false;ItemHeight=48;AccessibleName="상단 정렬 앱 · Space로 등록 또는 해제";}
     public void SetChecked(object item,bool value){if(value)checks.Add(item);else checks.Remove(item);Invalidate();ChecksChanged?.Invoke(this,EventArgs.Empty);}
     public void ResetChecks()=>checks.Clear();
     internal void TestKey(Keys key)=>OnKeyDown(new KeyEventArgs(key));
@@ -113,5 +114,25 @@ internal sealed class FlowAppList : ListBox
     }
     protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);int i=IndexFromPoint(e.Location);if(e.Button==MouseButtons.Left&&i>=0)SetChecked(Items[i],!checks.Contains(Items[i]));}
     protected override void OnKeyDown(KeyEventArgs e){if(e.KeyCode==Keys.Space&&SelectedIndex>=0){SetChecked(Items[SelectedIndex],!checks.Contains(Items[SelectedIndex]));e.Handled=e.SuppressKeyPress=true;}base.OnKeyDown(e);}
-    protected override void OnDrawItem(DrawItemEventArgs e){if(e.Index<0)return;var p=Palette;var g=e.Graphics;int D(float x)=>(int)Math.Round(x*DeviceDpi/96f);bool active=(e.State&DrawItemState.Selected)!=0,on=checks.Contains(Items[e.Index]);using(var b=new SolidBrush(active?p.Selected:p.Surface))g.FillRectangle(b,e.Bounds);g.SmoothingMode=SmoothingMode.AntiAlias;var r=new Rectangle(e.Bounds.X+D(10),e.Bounds.Y+(e.Bounds.Height-D(18))/2,D(18),D(18));UiPaint.Box(g,r,on?p.Accent:p.Raised,D(4),on?p.Accent:UiPaint.Border(p));if(on)UiPaint.Check(g,r,UiPaint.OnAccent(p));UiPaint.Text(g,Items[e.Index].ToString()??"",Font,new Rectangle(e.Bounds.X+D(42),e.Bounds.Y,e.Bounds.Width-D(52),e.Bounds.Height),p.Ink,TextFormatFlags.VerticalCenter);if((e.State&DrawItemState.Focus)!=0)ControlPaint.DrawFocusRectangle(g,Rectangle.Inflate(e.Bounds,-2,-2),p.Accent,p.Surface);}
+    protected override void OnDrawItem(DrawItemEventArgs e){
+        if(e.Index<0)return;var p=Palette;var g=e.Graphics;int D(float x)=>(int)Math.Round(x*DeviceDpi/96f);bool active=(e.State&DrawItemState.Selected)!=0,on=checks.Contains(Items[e.Index]);
+        using(var b=new SolidBrush(active?p.Selected:p.Surface))g.FillRectangle(b,e.Bounds);g.SmoothingMode=SmoothingMode.AntiAlias;
+        var r=new Rectangle(e.Bounds.X+D(10),e.Bounds.Y+(e.Bounds.Height-D(18))/2,D(18),D(18));UiPaint.Box(g,r,on?p.Accent:p.Raised,D(4),on?p.Accent:UiPaint.Border(p));if(on)UiPaint.Check(g,r,UiPaint.OnAccent(p));
+        var item=Items[e.Index] as IAppListItem;string title=item?.AppName??Items[e.Index].ToString()??"";
+        var icon=new Rectangle(e.Bounds.X+D(42),e.Bounds.Y+(e.Bounds.Height-D(28))/2,D(28),D(28));AppIconDrawing.Paint(g,icon,item?.AppIcon,title,Font,p);
+        var text=new Rectangle(e.Bounds.X+D(82),e.Bounds.Y+D(item==null?0:4),e.Bounds.Width-D(94),item==null?e.Bounds.Height:D(23));UiPaint.Text(g,title,Font,text,p.Ink,TextFormatFlags.VerticalCenter);
+        if(item!=null){processFont??=new Font(Font.FontFamily,8.5f);UiPaint.Text(g,item.ProcessName+".exe",processFont,new Rectangle(text.X,e.Bounds.Y+D(27),text.Width,D(18)),p.Muted);}
+        if((e.State&DrawItemState.Focus)!=0)ControlPaint.DrawFocusRectangle(g,Rectangle.Inflate(e.Bounds,-2,-2),p.Accent,p.Surface);
+    }
+    protected override void Dispose(bool disposing){if(disposing)processFont?.Dispose();base.Dispose(disposing);}
+}
+internal interface IAppListItem {string AppName{get;}string ProcessName{get;}Image? AppIcon{get;set;}}
+internal static class AppIconDrawing
+{
+    public static void Paint(Graphics g,Rectangle bounds,Image? icon,string name,Font font,ThemePalette p){
+        if(icon!=null){g.DrawImage(icon,bounds);return;}
+        UiPaint.Box(g,bounds,p.Raised,Math.Max(4,bounds.Width/4));
+        string initial=string.IsNullOrWhiteSpace(name)?"?":System.Globalization.StringInfo.GetNextTextElement(name.Trim()).ToUpperInvariant();
+        UiPaint.Text(g,initial,font,bounds,p.Accent,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter);
+    }
 }

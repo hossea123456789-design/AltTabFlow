@@ -1,20 +1,22 @@
 {
-  "version": "1.1.6",
+  "version": "1.1.7",
   "sourceFiles": 29,
-  "changedOrNewSourceFiles": 8,
-  "patchBase": "1.1.5",
-  "verifiedLocalVsGithubBlobs": true,
+  "changedSourceFiles": 9,
+  "patchBase": "1.1.6",
+  "sourcePatch": "docs/specs/AltTabFlow_1.1.7_갱신내용.md",
+  "staticPatchCheck": "PASS (9 exact contextual diffs)",
   "githubWindowsBuild": "PENDING",
-  "githubBasic117": "PENDING",
-  "githubUI62": "PENDING",
+  "githubBasic161": "PENDING",
+  "githubUi71": "PENDING",
   "manualWindowsTests": "NOT_RUN_IN_THIS_SESSION",
   "handoffReportedPassed": {
-    "basic": 117,
+    "basic": 161,
     "peek": 10,
     "menu": 7,
     "focus": 18,
-    "ui": 62,
-    "unique": 204,
+    "ui": 71,
+    "unique": 257,
     "overlap": 10
-  }
+  },
+  "handoffNote": "Earlier normal-integrity foreground test failed when elevated MapleStory was foreground; admin full-suite pass reported; must re-verify locally."
 }
