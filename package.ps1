@@ -1,4 +1,4 @@
-﻿param([string]$RuntimeVersion='8.0.32')
+﻿param([string]$RuntimeVersion='8.0.32',[string]$PublishedExe='',[string]$PublishedSha256='')
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $projectRoot=[IO.Path]::GetFullPath($PSScriptRoot)
@@ -13,8 +13,14 @@ if(Test-Path -LiteralPath $stageRoot){throw "Build folder already exists: $stage
 New-Item -ItemType Directory -Path $stage,$releaseRoot,$verifyRoot -Force | Out-Null
 Push-Location $projectRoot
 try {
-    dotnet publish 'AltTabFlow.csproj' -c Release -r win-x64 --self-contained true "-p:RuntimeFrameworkVersion=$RuntimeVersion" -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=true -p:EnableCompressionInSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o $stage --nologo
-    if($LASTEXITCODE -ne 0){throw 'Self-contained publish failed'}
+    if($PublishedExe){
+        if(!$PublishedSha256 -or (Get-FileHash -LiteralPath $PublishedExe -Algorithm SHA256).Hash -ne $PublishedSha256){throw 'Explicit published executable hash required'}
+        if([Diagnostics.FileVersionInfo]::GetVersionInfo($PublishedExe).ProductVersion -ne $version){throw 'Published executable version mismatch'}
+        Copy-Item -LiteralPath $PublishedExe -Destination (Join-Path $stage 'AltTabFlow.exe')
+    } else {
+        dotnet publish 'AltTabFlow.csproj' -c Release -r win-x64 --self-contained true "-p:RuntimeFrameworkVersion=$RuntimeVersion" -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=true -p:EnableCompressionInSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o $stage --nologo
+        if($LASTEXITCODE -ne 0){throw 'Self-contained publish failed'}
+    }
     $exe=Join-Path $stage 'AltTabFlow.exe'
     if(!(Test-Path -LiteralPath $exe)){throw 'Executable missing'}
     $test=Start-Process -FilePath $exe -ArgumentList '--self-test' -WindowStyle Hidden -Wait -PassThru
@@ -30,6 +36,11 @@ try {
     if($menuTest.ExitCode -ne 0){throw 'Context menu lifetime regression failed'}
     $menuReport=Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\menu-test.json') -Raw | ConvertFrom-Json
     if($menuReport.failures -ne 0){throw 'Context menu lifetime failures found'}
+    $focusTest=Start-Process -FilePath $exe -ArgumentList '--focus-self-test' -WindowStyle Hidden -Wait -PassThru
+    if($focusTest.ExitCode -ne 0){throw 'Foreground permission and delayed target regression failed'}
+    $focusReport=Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\focus-test.json') -Raw | ConvertFrom-Json
+    if($focusReport.failures -ne 0){throw 'Foreground regression failures found'}
+    Copy-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\focus-test.json') -Destination (Join-Path $projectRoot 'verification-focus-after.json')
     Copy-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\menu-test.json') -Destination (Join-Path $projectRoot 'verification-menu-after.json')
     Copy-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\peek-test.json') -Destination (Join-Path $projectRoot 'verification-peek-after.json')
     Copy-Item -LiteralPath $testPath -Destination (Join-Path $projectRoot 'verification-tests.json')
@@ -45,6 +56,7 @@ try {
     $info=[ordered]@{product='AltTabFlow';version=$version;build=$buildId;builtAtKst=$kst.ToString('yyyy-MM-ddTHH:mm:ss')+'+09:00';platform='win-x64';selfContained=$true;runtimeVersion=$RuntimeVersion;exeSha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash;testsPassed=@($report.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count}
     $info.nativeTestsPassed=@($nativeReport.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
     $info.menuTestsPassed=@($menuReport.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
+    $info.focusTestsPassed=@($focusReport.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
     $info | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stage 'release-info.json') -Encoding UTF8
     $zipName="AltTabFlow-v$version-win-x64-$buildId.zip"
     $zip=Join-Path $releaseRoot $zipName
@@ -58,7 +70,9 @@ try {
     $manifest=[ordered]@{version=$version;build=$buildId;archive=$zipName;latest='AltTabFlow-latest-win-x64.zip';sha256=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash;bytes=(Get-Item -LiteralPath $zip).Length;exeSha256=$info.exeSha256;selfContained=$true;runtimeVersion=$RuntimeVersion;testsPassed=$info.testsPassed;extractedExe=$extracted}
     $manifest.nativeTestsPassed=$info.nativeTestsPassed
     $manifest.menuTestsPassed=$info.menuTestsPassed
+    $manifest.focusTestsPassed=$info.focusTestsPassed
     $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $releaseRoot 'latest.json') -Encoding UTF8
     "$($manifest.sha256)  $zipName" | Set-Content -LiteralPath ($zip+'.sha256') -Encoding ASCII
     $manifest | ConvertTo-Json
 } finally {Pop-Location}
+

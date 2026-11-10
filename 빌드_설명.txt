@@ -1,17 +1,17 @@
-AltTabFlow 1.1.2 | Windows x64 소스와 자동 빌드 키트
+AltTabFlow 1.1.4 | Windows x64 소스와 자동 빌드 키트
 
 [현재 상태]
 - 1.1.1 전체 소스에 1.1.2 정식 변경 패치를 적용한 26개 파일입니다.
 - ContextMenuStrip 우클릭 메뉴 종료 오류를 수정하고 메뉴 회귀 검사를 추가했습니다.
 - 이 저장소에는 소스와 자동 빌드 스크립트가 있으며 Windows 실행 파일(EXE)은 포함되지 않습니다.
-- GitHub 이관 환경에서는 Windows 컴파일 및 72+10+7개 런타임 검사를 실행하지 않았습니다.
+- GitHub 이관 환경에서는 Windows 컴파일 및 87+10+7+18 (10개 중복)개 런타임 검사를 실행하지 않았습니다.
 - Windows CI 후보는 실제 게임/다중 모니터 창 제어 검증을 의미하지 않습니다.
 
 [Windows 배포 빌드]
 1. 저장소를 내려받아 압축을 해제합니다.
 2. Windows-Build.cmd를 실행합니다.
 3. .NET 8 SDK가 없으면 설치 여부를 묻습니다.
-4. package.ps1이 self-contained EXE와 ZIP을 만들고 89개 자동 검사 실행을 시도합니다.
+4. package.ps1이 self-contained EXE와 ZIP을 만들고 112개 고유 자동 검사 실행을 시도합니다.
 5. 세 검사가 모두 통과해야 releases\AltTabFlow-latest-win-x64.zip이 생성됩니다.
 
 [주의]
