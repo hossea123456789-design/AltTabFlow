@@ -1,5 +1,14 @@
 # AltTabFlow — 후속 세션 인계 / START HERE
 
+## 1.1.13 사용자 실사용 증상과 패치 설계
+
+- 사용자 스크린샷 (사용자 개인 업로드이며 GitHub에는 업로드하지 않음): 메이플 목록에서 MapleStory 항목을 거친 다음 전환 UI가 1~2회의 Alt+Tab 동안 가려졌다가 복구됨. 오른쪽 썸네일 카드의 `선택한 창 미리보기` 라벨과 창 제목 `MapleStory`의 글자 겹침.
+- 이전 구현의 `TargetPeek.Select`가 선택된 **MapleStory 게임 HWND 자체를 chooser 뒤의 topmost Z-order 밴드로 임시 승격**. Alt+Enter 후 game fullscreen이 focus/desktop composition을 되잡는 상황의 유력 원인 후보. 선택 시 MapleStory 외부 Peek/Aura/Dim 억제, DWM 썸네일은 유지. 실제 실행 대상 전환은 기존 `Native.Activate`를 사용.
+- `SwitcherForm.Deactivate`는 origin으로 돌아온 경우 외에는 즉시 종료했기 때문에 게임이 타 창에서 재활성화돼도 종료됨. 실제 Alt 물리 키가 눌렸거나 마지막 전환 입력 220ms 이내의 **일반** Alt+Tab 세션을 잠시 보호(고정 세션 제외).
+- 미리보기 하단 안내는 창 제목 영역과 중복되어 제거. `LayoutPreviewSidebar`는 제목이 버튼 위로 오도록 가용 높이 조절. 확대 UI 580/650/735/950 logical viewport 검사.
+- 신규 UI 검사 11개, 목표: 기본206 + UI96 + updater22 + elevated startup11 = 총 **335**.
+- 메이플 Alt+Enter 실사용·독점 전체화면 표시는 CI에서 검증할 수 없음. 안전하게 기존 1.1.12 유지한 채 1.1.13 릴리스 설치 후 직접 전환 비교.
+
 ## 1.1.12 최신 확정 배포 결과 (2026-11-11)
 
 - **main 1.1.12**: [PR #10 병합](https://github.com/hossea123456789-design/AltTabFlow/pull/10), [main Windows CI #42850336840 성공](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42850336840): 기본206 + UI85 + updater22 + 관리자 시작11 = **324/324 자동 검사 통과**.
@@ -16,6 +25,8 @@
 
 - 저장소: [hossea123456789-design/AltTabFlow](https://github.com/hossea123456789-design/AltTabFlow) (**Private**)
 - 기본 브랜치: `main`; 변경은 `update/vX.Y.Z-...` 브랜치와 Pull Request로 진행.
+- **1.1.13 수정 진행:** `fix/v1.1.13-maple-fullscreen-peek-preview-layout`에서 MapleStory Alt+Enter 후 전환창이 1~2회 가려지는 현상 및 오른쪽 제목 겹침 수정. CI/병합/릴리스 검증 전이며 **1.1.12 공개 배포 성공 기록은 유지**.
+
 - **1.1.12 단일 Public 저장소 전환 완료 (기존 작성 당시 PR 진행):** `feature/v1.1.12-single-public-repo-auto-release`에서 별도 `AltTabFlow-Downloads` 및 배포 PAT 의존성 제거, 동일 저장소 Release API + GITHUB_TOKEN 배포. GitHub 연결로 repo visibility 변경은 불가능하므로 **사용자의 일회성 Public 전환 필요**. 승인 전 실제 공개 릴리스가 생성됐다고 주장하지 말 것.
 - **직전 `main`: 1.1.11.** [PR #9](https://github.com/hossea123456789-design/AltTabFlow/pull/9) [성공 Windows CI #42842347985](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) 검증 후 [커밋 93fd8ce](https://github.com/hossea123456789-design/AltTabFlow/commit/93fd8ceb7e4fef0114a7ba941b9a1c78100493f7)로 병합 완료. 기본206 + UI85 + 업데이터22 + 관리자 시작11 = **324/324개 자동 검사 통과**. 실행 후보 ZIP·메인/설정/업데이트 WinForms 캡처 업로드 성공. **공개 실행 파일 저장소 미생성·실제 MapleStory/온라인 갱신 검증 미실행은 별도**.
 - **이전 기준 1.1.10:** [PR #8](https://github.com/hossea123456789-design/AltTabFlow/pull/8)을 [Windows 성공 CI #42832500112](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 이후 [커밋 0841c00](https://github.com/hossea123456789-design/AltTabFlow/commit/0841c00da08fa5287e971197894dfd2987b4ac14)로 병합했습니다. SHA-256·컴파일·단일 EXE·기본206/UI80/업데이터11/관리자 시작11 = **308개 CI 검사 성공**, 실제 메인·설정·업데이트 창 캡처 및 ZIP 업로드 성공.
