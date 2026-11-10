@@ -13,6 +13,8 @@ internal sealed class SwitcherForm : Form
     private readonly ContextMenuStrip itemMenu = new();
     private readonly ToolTip toolTip = new() { InitialDelay = 550, ReshowDelay = 150, AutoPopDelay = 8000 };
     private readonly List<(Rectangle Rect, Action Action, string Tip)> hits = new();
+    private Rectangle hoverRect,pressedRect;
+    private Action? pressedAction;
     private readonly List<nint> thumbnails = new();
     private readonly List<(WindowInfo Window, Rectangle Rect)> desiredThumbs = new();
     private string thumbnailSignature = "", lastTip = "";
@@ -316,6 +318,7 @@ internal sealed class SwitcherForm : Form
         foreach(ToolStripItem previous in itemMenu.Items.Cast<ToolStripItem>().ToArray())previous.Dispose();
         selected=index; Invalidate(); persistent=true;
         var item=entries[index]; var menu=itemMenu;
+        menu.Renderer=new FlowMenuRenderer(Palette);menu.BackColor=Surface;menu.ForeColor=Ink;
         menu.Items.Add("이 창으로 전환", null, (_,_)=>Choose());
         if(item.IsGroup) menu.Items.Add($"{item.Windows.Count}개 창 펼치기",null,(_,_)=>ExpandGroup());
         menu.Items.Add(prefs.Pinned.Contains(item.Window.ProcessName,StringComparer.OrdinalIgnoreCase) ? "상단 정렬 해제" : "상단 정렬에 등록",null,(_,_)=>TogglePin());
@@ -329,13 +332,18 @@ internal sealed class SwitcherForm : Form
             int i=HitEntry(e.Location); if(i>=0) ShowItemMenu(i,e.Location); return;
         }
         if(e.Button!=MouseButtons.Left) return;
-        foreach(var hit in hits.AsEnumerable().Reverse()) if(hit.Rect.Contains(e.Location)) { hit.Action(); return; }
+        foreach(var hit in hits.AsEnumerable().Reverse()) if(hit.Rect.Contains(e.Location)) { pressedRect=hit.Rect;pressedAction=hit.Action;Capture=true;Invalidate(pressedRect);return; }
     }
+    protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);if(e.Button!=MouseButtons.Left)return;var action=pressedAction;var rect=pressedRect;pressedAction=null;pressedRect=Rectangle.Empty;Capture=false;Invalidate(rect);if(rect.Contains(e.Location))action?.Invoke();}
+    protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture){pressedAction=null;var old=pressedRect;pressedRect=Rectangle.Empty;if(!old.IsEmpty)Invalidate(old);}}
+    protected override void OnMouseLeave(EventArgs e){base.OnMouseLeave(e);var old=hoverRect;hoverRect=Rectangle.Empty;if(!old.IsEmpty)Invalidate(old);}
     private readonly Dictionary<int,Rectangle> entryRects=new();
     private int HitEntry(Point p) { foreach(var kv in entryRects) if(kv.Value.Contains(p)) return kv.Key; return -1; }
     protected override void OnMouseMove(MouseEventArgs e) {
         base.OnMouseMove(e); string tip="";
-        foreach(var hit in hits.AsEnumerable().Reverse()) if(hit.Rect.Contains(e.Location)) { tip=hit.Tip; break; }
+        var next=Rectangle.Empty;
+        foreach(var hit in hits.AsEnumerable().Reverse()) if(hit.Rect.Contains(e.Location)) { tip=hit.Tip;next=hit.Rect;break; }
+        if(next!=hoverRect){var old=hoverRect;hoverRect=next;if(!old.IsEmpty)Invalidate(old);if(!next.IsEmpty)Invalidate(next);}
         Cursor=hits.Any(h=>h.Rect.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
         if(tip!=lastTip) { toolTip.SetToolTip(this, tip); lastTip=tip; }
     }
@@ -357,8 +365,11 @@ internal sealed class SwitcherForm : Form
         using var path=RoundPath(r,D(radius)); using var brush=new SolidBrush(fill); g.FillPath(brush,path);
         if(stroke!=null) { using var pen=new Pen(stroke.Value,D(1)); g.DrawPath(pen,path); }
     }
-    private void Button(Graphics g,string text,Rectangle rect,Action action,bool active=false,string tip="") {
-        Box(g,rect,active?SelectedBg:Raised,8); Txt(g,text,Rectangle.Inflate(rect,-D(8),0),13,active?Accent:Ink,active,false,TextFormatFlags.VerticalCenter|TextFormatFlags.HorizontalCenter);
+    private void Button(Graphics g,string text,Rectangle rect,Action action,bool active=false,string tip="",bool quiet=false,bool primary=false) {
+        var fill=primary?Accent:active?SelectedBg:quiet?Bg:Surface;
+        if(rect==hoverRect||rect==pressedRect)fill=UiPaint.Blend(fill,rect==pressedRect?Ink:Accent,rect==pressedRect?.15f:.09f);
+        Box(g,rect,fill,9,active?Accent:quiet&&rect!=hoverRect?null:UiPaint.Border(Palette));
+        Txt(g,text,Rectangle.Inflate(rect,-D(8),0),13,primary?UiPaint.OnAccent(Palette):active?Accent:Ink,active||primary,false,TextFormatFlags.VerticalCenter|TextFormatFlags.HorizontalCenter);
         hits.Add((rect,action,tip));
     }
     protected override void OnPaint(PaintEventArgs e) {
@@ -367,19 +378,20 @@ internal sealed class SwitcherForm : Form
         g.DrawImage(brandIcon,R(23,20,46,46));
         Txt(g,"AltTabFlow",R(74,22,300,30),23,Ink,true);
         Txt(g,persistent?"상세 선택 · Enter 전환 / Esc 닫기":"빠른 전환 · 키를 모두 놓으면 전환",R(75,54,470,22),12,persistent?Accent:Muted);
-        Button(g,"설정",R(W-158,31,66,32),ShowSettings,false,"F2 · 보기, 단축키, 제외 목록");
-        Button(g,"닫기",R(W-82,31,54,32),()=>Dismiss(true),false,"Esc · 원래 창으로 돌아가기");
-        Box(g,R(28,84,W-56,47),Surface,12);
+        Button(g,"설정  F2",R(W-210,28,94,38),ShowSettings,false,"F2 · 보기, 단축키, 제외 목록",true);
+        Button(g,"닫기  Esc",R(W-108,28,80,38),()=>Dismiss(true),false,"Esc · 원래 창으로 돌아가기",true);
+        Box(g,R(28,84,W-56,47),Surface,12,search.Focused?Accent:UiPaint.Border(Palette));
         using(var pen=new Pen(Muted,D(1.8f))) { g.DrawEllipse(pen,D(42),D(99),D(11),D(11)); g.DrawLine(pen,D(51),D(108),D(56),D(113)); }
         if(search.Text.Length>0) Button(g,"×",R(W-65,92,28,28),()=>search.Clear());
         string[] modes={"목록","카드","아이콘"};
-        for(int i=0;i<modes.Length;i++) { string mode=modes[i]; Button(g,mode,R(28+i*75,147,67,34),()=>SetView(mode),prefs.View==mode,$"Ctrl+{i+1}"); }
-        Button(g,prefs.GroupApps?"앱별 묶기  켜짐":"앱별 묶기  꺼짐",R(272,147,142,34),()=> { persistent=true;prefs.GroupApps=!prefs.GroupApps; group=null; SavePreferences(); Rebuild(false); },prefs.GroupApps);
-        if(prefs.View=="목록")Button(g,"미리보기",R(429,147,89,34),()=> {persistent=true;prefs.ShowPreview=!prefs.ShowPreview;SavePreferences();ClearThumbnails();ApplyBounds();EnsurePage();Invalidate();},listLayout.Preview,"목록 옆에 미리보기 표시 · 화면이 좁으면 자동 접힘");
+        Box(g,R(28,143,233,42),Surface,11);
+        for(int i=0;i<modes.Length;i++) { string mode=modes[i]; Button(g,mode,R(32+i*76,147,73,34),()=>SetView(mode),prefs.View==mode,$"Ctrl+{i+1}"); }
+        Button(g,prefs.GroupApps?"앱별 묶기  ✓":"앱별 묶기",R(277,145,132,38),()=> { persistent=true;prefs.GroupApps=!prefs.GroupApps; group=null; SavePreferences(); Rebuild(false); },prefs.GroupApps);
+        if(prefs.View=="목록")Button(g,listLayout.Preview?"미리보기  ✓":"미리보기",R(419,145,110,38),()=> {persistent=true;prefs.ShowPreview=!prefs.ShowPreview;SavePreferences();ClearThumbnails();ApplyBounds();EnsurePage();Invalidate();},listLayout.Preview,"목록 옆에 미리보기 표시 · 화면이 좁으면 자동 접힘");
         int total=entries.Sum(x=>x.Windows.Count);
         Txt(g,$"{entries.Count}개 항목  ·  {total}개 창",R(W-275,155,247,24),13,Muted,false,false,TextFormatFlags.Right);
         if(group!=null) {
-            Button(g,"‹ 전체 앱",R(28,194,95,26),GoBack,false,"← · 앱 목록으로 돌아가기");
+            Button(g,"‹ 전체 앱",R(28,194,95,26),GoBack,false,"Backspace · 앱 목록으로 돌아가기",true);
             Txt(g,snapshot.FirstOrDefault(w=>w.GroupKey==group)?.AppName??"앱의 창",R(137,197,W-300,24),13,Accent,true);
         } else Txt(g,search.Text.Length>0?"검색 결과 · 제목을 확인하고 바로 전환하세요":prefs.Pinned.Count>0?"상단 등록 앱 먼저 · 각 그룹 A~Z → 가나다순":"앱 이름순 · A~Z → 가나다 · Enter로 묶음 펼치기",R(28,199,W-56,24),12,Muted);
         if(entries.Count==0) {
@@ -408,7 +420,7 @@ internal sealed class SwitcherForm : Form
         for(int i=start;i<Math.Min(entries.Count,start+pageSize);i++) {
             int index=i,local=i-start;var item=entries[i];var row=R(28+(local/listLayout.Rows)*(width+14),229+(local%listLayout.Rows)*listLayout.Pitch,width,listLayout.Pitch-8);
             bool active=i==selected;
-            Box(g,row,active?SelectedBg:Surface,10,active?Accent:null);
+            Box(g,row,active?SelectedBg:row==hoverRect?UiPaint.Blend(Surface,Accent,.055f):Surface,10,active?Accent:null);
             var icon=WindowCatalog.CachedIcon(item.Window);
             g.DrawImage(icon,new Rectangle(row.X+D(15),row.Y+(row.Height-D(32))/2,D(32),D(32)));
             bool pin=prefs.Pinned.Contains(item.Window.ProcessName,StringComparer.OrdinalIgnoreCase);
@@ -429,7 +441,7 @@ internal sealed class SwitcherForm : Form
         Txt(g,w.Title,R(px+20,ty+35,pw-40,63),14,Muted,false,true);
         string tag=w.Minimized?"최소화된 창 · 선택하면 복원":"선택한 창 미리보기";
         Txt(g,tag,R(px+20,H-160,pw-40,23),11,Muted);
-        Button(g,"이 창으로 전환  ↵",R(px+20,H-125,pw-40,36),Choose,true);
+        Button(g,"이 창으로 전환  ↵",R(px+20,H-125,pw-40,40),Choose,false,"",false,true);
     }
     private void PaintTiles(Graphics g) {
         int start=page*pageSize; float gap=12, tw=(W-56-(columns-1)*gap)/columns;
@@ -503,6 +515,8 @@ internal sealed class SwitcherForm : Form
     // Exercise the real keyboard routing on an off-screen form without moving user windows.
     internal void PrepareNavigationTest(List<WindowInfo> windows,bool pinned=false){snapshot=windows;selected=page=0;group=null;persistent=pinned;Rebuild(false);ApplyBounds();}
     internal bool TestKey(Keys key){var message=Message.Create(Handle,0x100,(nint)(int)key,0);return ProcessCmdKey(ref message,key);}
+    internal void TestMouse(Point point,bool down){var e=new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0);if(down)OnMouseDown(e);else OnMouseUp(e);}
+    internal Rectangle TestEntryBounds(int index)=>entryRects[index];
     internal void TestActivate()=>activation.Request(Handle);
     internal ContextMenuStrip TestItemMenu(int index)=>ShowItemMenu(index,new Point(160,240));
     internal (string? Group,int Count,bool Persistent,nint Selected) NavigationState=>(group,entries.Count,persistent,selected<entries.Count?entries[selected].Window.Handle:0);

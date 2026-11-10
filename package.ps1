@@ -40,6 +40,11 @@ try {
     if($focusTest.ExitCode -ne 0){throw 'Foreground permission and delayed target regression failed'}
     $focusReport=Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\focus-test.json') -Raw | ConvertFrom-Json
     if($focusReport.failures -ne 0){throw 'Foreground regression failures found'}
+    $uiTest=Start-Process -FilePath $exe -ArgumentList '--ui-self-test' -WindowStyle Hidden -Wait -PassThru
+    if($uiTest.ExitCode -ne 0){throw 'Settings and UI interaction regression failed'}
+    $uiReport=Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\ui-test.json') -Raw | ConvertFrom-Json
+    if($uiReport.failures -ne 0){throw 'UI regression failures found'}
+    Copy-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\ui-test.json') -Destination (Join-Path $projectRoot 'verification-ui-after.json')
     Copy-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\focus-test.json') -Destination (Join-Path $projectRoot 'verification-focus-after.json')
     Copy-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\menu-test.json') -Destination (Join-Path $projectRoot 'verification-menu-after.json')
     Copy-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'AltTabFlow\peek-test.json') -Destination (Join-Path $projectRoot 'verification-peek-after.json')
@@ -57,6 +62,7 @@ try {
     $info.nativeTestsPassed=@($nativeReport.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
     $info.menuTestsPassed=@($menuReport.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
     $info.focusTestsPassed=@($focusReport.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
+    $info.uiTestsPassed=@($uiReport.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
     $info | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stage 'release-info.json') -Encoding UTF8
     $zipName="AltTabFlow-v$version-win-x64-$buildId.zip"
     $zip=Join-Path $releaseRoot $zipName
@@ -71,6 +77,7 @@ try {
     $manifest.nativeTestsPassed=$info.nativeTestsPassed
     $manifest.menuTestsPassed=$info.menuTestsPassed
     $manifest.focusTestsPassed=$info.focusTestsPassed
+    $manifest.uiTestsPassed=$info.uiTestsPassed
     $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $releaseRoot 'latest.json') -Encoding UTF8
     "$($manifest.sha256)  $zipName" | Set-Content -LiteralPath ($zip+'.sha256') -Encoding ASCII
     $manifest | ConvertTo-Json
