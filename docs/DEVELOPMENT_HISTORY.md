@@ -6,6 +6,7 @@
 
 | 버전 | 요청/구현의 핵심 | 테스트 수 (중복 제외, 명세 기록) | GitHub에서 별도 검증한 범위 |
 |---|---|---:|---|
+| **1.1.10** | 관리자 자동 시작을 Run 키에서 Task Scheduler Interactive/Highest로 전환, Program Files 보호 설치; 업데이트 창 사라짐·ESC 복구 보고에 대응해 독립 화면/취소 UI; 휠 강제 persistent 버그 제거 | 기본206+UI80+Updater11+Startup11=CI 목표308; Peek/Menu/Focus 추가25 | [사용자 요청과 검증 체크리스트](specs/AltTabFlow_1.1.10-요구사항.md), 실제 UAC/로그온/게임/온라인 업데이트 검증은 PR·CI와 별도 기록 |
 | 1.1.1 | 원본 완전 명세와 복원 스크립트, WinForms 25파일, MRU·Peek·테마·게임 호환 | 기본 72 + Peek 10 | Linux 작업 환경에서 소스·SHA 검증. Windows EXE 생성/실동작 재검증은 하지 않음 |
 | 1.1.2 | ContextMenuStrip Closed/Dispose 생명주기 오류 수정, 초기화/런타임 오류 분리, 메뉴 7개 검사 | 89 (72+10+7) | 소스/패치 복원 후 비공개 GitHub 저장소 최초 등록. 초기 Windows CI 컴파일+실제 UI screenshot 성공 |
 | 1.1.3 | 전경 전환 회귀 발생, 1.1.4에서 해결하도록 갱신 명세가 지시 | 별도 최종판 아님 | 이 저장소의 정식 안정 버전으로 취급하지 않음 |

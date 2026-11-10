@@ -2,6 +2,17 @@
 
 이 파일은 사용자 제공 1.1.1 완전 명세, 1.1.2·1.1.4·1.1.5·1.1.6·1.1.7·1.1.8 변경 명세를 기준으로 작성했습니다.
 
+## [1.1.10] - 2026-11-10
+
+### 사용자 요청: 매번 관리자 전환·사라지는 업데이트 창·휠 전환 수정
+- `ElevatedStartup.cs`: Task Scheduler COM API로 **현재 로그인 사용자**의 `TASK_LOGON_INTERACTIVE_TOKEN`(3), `TASK_RUNLEVEL_HIGHEST`(1), 로그온 트리거를 등록. 등록은 명시적 체크·한 번의 UAC 승인을 요구하며 다른 Windows 사용자 계정 UAC 사용은 거부
+- 관리자 자동 시작 실행 파일은 Downloads/AppData 등 사용자 쓰기 폴더를 직접 가리키지 않고 `Program Files\AltTabFlow` 보호 폴더에 설치. 일반 Run 키 중복 등록 방지, 해제·취소 시 원본 설정 보존
+- `UpdateWindow.cs`: updater 토큰 입력/상태/취소를 별도 TopMost·taskbar-visible 창에 표시. 잠깐 나타났다가 사라지는 `PromptToken` 제거. 닫기/ESC와 다운로드 취소를 분리하고, 실제 설치 종료 때만 호스트 종료 허용
+- `GitHubUpdater.cs`: 다운로드/메타데이터 요청 중 CancellationToken 적용. 업데이트 실패·취소 시 기존 프로그램 유지
+- `SwitcherForm.cs`: 마우스 휠 탐색 이벤트의 `persistent=true` 제거. 일반 Alt+Tab은 휠로 선택을 바꾸어도 **마지막 키 해제 시 확정**, Ctrl+Alt+Tab 고정 모드는 계속 유지
+- 신규 검사: 휠/업데이트 창 UI 9개 추가(기존 71→**80**), 예약 시작 계획·보호 경로 **11개** 추가. 기존 기본206·업데이터11 검사 유지
+- GitHub Actions에서 UI 80/80, 예약 시작 11/11, 입력 206/206, 업데이터 11/11 확인 예정. 실제 Windows UAC, 로그온, 메이플스토리 및 온라인 업데이트 종단 간 검증은 별도
+
 ## [1.1.9] - 2026-11-10
 
 ### 관리자 게임 호환 및 자체 업데이트

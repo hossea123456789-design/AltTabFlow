@@ -6,7 +6,8 @@
 
 - 저장소: [hossea123456789-design/AltTabFlow](https://github.com/hossea123456789-design/AltTabFlow) (**Private**)
 - 기본 브랜치: `main`; 변경은 `update/vX.Y.Z-...` 브랜치와 Pull Request로 진행.
-- **현재 `main`: 1.1.9**, [PR #7](https://github.com/hossea123456789-design/AltTabFlow/pull/7)을 [Windows 성공 CI #42812687675](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42812687675) 이후 [커밋 51175f3](https://github.com/hossea123456789-design/AltTabFlow/commit/51175f30dd9c0e0aa8792593e3956703f7f24e8d)로 병합했습니다. 체크섬·컴파일·단일 EXE 게시·기본 206/206·UI 71/71·Updater 11/11·실제 메인/설정 캡처 및 동일 폴더 배포 후보 업로드까지 성공했습니다.
+- **업데이트 작업:** `feature/v1.1.10-startup-updater-wheel` 브랜치에서 **1.1.10** Windows 로그인 관리자 자동 시작·항상 보이는 업데이트 창·휠 마지막 키 해제 확정을 구현 중. 최신 `main` 병합 여부와 CI를 반드시 조회합니다.
+- **직전 `main`: 1.1.9**, [PR #7](https://github.com/hossea123456789-design/AltTabFlow/pull/7)을 [Windows 성공 CI #42812687675](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42812687675) 이후 [커밋 51175f3](https://github.com/hossea123456789-design/AltTabFlow/commit/51175f30dd9c0e0aa8792593e3956703f7f24e8d)로 병합했습니다. 체크섬·컴파일·단일 EXE 게시·기본 206/206·UI 71/71·Updater 11/11·실제 메인/설정 캡처 및 동일 폴더 배포 후보 업로드까지 성공했습니다.
 - **직전 기준 버전 `main`: 1.1.8**, 소스 병합 커밋 [`8fca819`](https://github.com/hossea123456789-design/AltTabFlow/commit/8fca8193761bca80812b20c188350d7e4165f34f) ([PR #6](https://github.com/hossea123456789-design/AltTabFlow/pull/6)). 새 세션에서는 최신 `main` HEAD와 PR/Actions를 다시 확인하세요.
 - **1.1.8 변경:** 일반 Alt+Tab 종료 누락 복구, 16ms 활성 세션 복구 타이머, 오래된 키 기록 정리, 이전 고정 UI 재시작 상태 초기화. [PR #6 Windows CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42792830910)에서 SHA-256·.NET 컴파일·단일 EXE·기본 206개·UI 71개·메인/설정 스크린샷 성공.
 - **1.1.7 변경:** 9개 소스 파일 변경, 전체 인계 문서 추가, 줄바꿈 정책·SHA-256 검증 자동화. [Windows PR CI #42777258155](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155)에서 체크섬·컴파일·EXE 게시·기본 161개·UI 71개·실제 WinForms 메인/설정 화면 캡처 성공. 새 세션에서는 최신 `main`/PR/Actions를 다시 확인.
@@ -41,6 +42,14 @@
 - **P4 및 소유 팝업:** 실제로 클릭한 전경 창과 소유 관계를 고려해 MRU 왕복. 실제 전경 활성화 성공을 확인한 뒤 전환기 종료.
 - **1.1.6 UI:** 좌측 메뉴/설정 카드/하단 저장, 7종 테마, 모니터·크기·보기·제외 목록; 미리보기·취소는 원본 설정 파일을 변경하지 않음.
 - **1.1.7 설정:** 숨길 앱 입력창 Enter는 줄바꿈; 수동 상단 등록 앱 이름 입력 Enter는 등록. 상단 등록 앱 행에는 체크+실제 아이콘+앱/프로세스 이름, 아이콘 없으면 글자 배지.
+
+## 1.1.10 사용자 보고 버그·후속 개발
+
+1. 1.1.9까지는 Windows Run 키가 `asInvoker` EXE를 실행하므로 재부팅/로그인 후 관리자 권한을 유지하지 못함. 설정 체크+저장 → UAC 1회 → Program Files 보호 설치 → 작업 스케줄러 현재 사용자 Interactive+Highest 로그온 작업으로 등록. 일반 Run 키와 중복 시작 금지, 해제 시 작업 제거.
+2. 1.1.9에서 '업데이트 확인' 후 정체불명 작은 창이 곧 사라지고 UI가 먹통(ESC로 복구)이라는 보고. 원인을 단정하지 않되 기존 `PromptToken`의 중첩 모달/TopMost 소유 관계를 제거하고 `UpdateWindow`에서 계속 보이는 토큰·진행·취소 UI로 전환. 숨은 팝업 없이 오류·취소도 창에서 처리.
+3. 기존 `SwitcherForm.MouseWheel`에서 `persistent=true`를 무조건 설정한 명확한 버그. 휠은 `MoveSelection`만 수행, 일반 빠른 Alt+Tab의 마지막 key-up에서 하이라이트된 창 Commit. 명시적 Ctrl+Alt+Tab 고정에서만 해제 후 화면 유지.
+4. 신규 CI 목표: 기본 206, UI **80**, updater 11, elevated startup **11** = 총 **308개** 자체 검사. 기존 Peek10/Menu7/Focus18(Peek10 중복) 실기기 회귀는 별도. GitHub에서 정식 Release로 홍보 전 로그인/권한/실제 MapleStory/업데이트 경로를 반드시 실측.
+5. 새 API/테스트: `ElevatedStartup.cs`, `UpdateWindow.cs`, `--startup-self-test`, `--update-preview` 및 CI 화면 캡처.
 
 ## 1.1.9 게임 관리자 모드 / EXE 자체 업데이트
 
