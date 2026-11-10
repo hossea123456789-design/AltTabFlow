@@ -136,8 +136,8 @@ internal sealed class SwitcherContext : ApplicationContext
            Interlocked.CompareExchange(ref drainPosted,1,0)!=0)return;
         // Keep the lease raised while draining; never post one callback per key.
         try{form.BeginInvoke((Action)DrainInput);}
-        catch(InvalidOperationException){Interlocked.Exchange(ref drainPosted,0);}
         catch(ObjectDisposedException){Interlocked.Exchange(ref drainPosted,0);}
+        catch(InvalidOperationException){Interlocked.Exchange(ref drainPosted,0);}
     }
     private void DrainInput() {
         long started=Stopwatch.GetTimestamp();
