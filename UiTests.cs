@@ -136,6 +136,17 @@ internal static class UiTests
                 SwitcherForm.CommitDeadlineMs>=WindowActivation.ActivationDeadlineMs&&
                 SwitcherForm.CommitDeadlineMs<=1500);
         }finally{overlayTest.Close();overlayTest.Dispose();gameOrigin.Close();gameOrigin.Dispose();}
+        // Physical Alt+Tab bursts must allow Paint/Commit timers to run.
+        Check("rapid AltTab commands are bounded per UI drain pass",
+            InputDrainPolicy.MaxCommandsPerPass>=16&&InputDrainPolicy.MaxCommandsPerPass<=64);
+        Check("rapid AltTab queue snapshots preserve bounded FIFO slices",
+            InputDrainPolicy.SnapshotLimit(0)==InputDrainPolicy.MaxCommandsPerPass&&
+            InputDrainPolicy.SnapshotLimit(InputDrainPolicy.MaxCommandsPerPass-1)==1&&
+            InputDrainPolicy.SnapshotLimit(InputDrainPolicy.MaxCommandsPerPass)==0);
+        Check("rapid AltTab drain yields for elapsed time or command count",
+            !InputDrainPolicy.ShouldYield(0,TimeSpan.Zero)&&
+            InputDrainPolicy.ShouldYield(InputDrainPolicy.MaxCommandsPerPass,TimeSpan.Zero)&&
+            InputDrainPolicy.ShouldYield(1,TimeSpan.FromMilliseconds(InputDrainPolicy.MaxMillisecondsPerPass+1)));
         // MapleStory fullscreen focus regression: merely highlighting the
         // game's row must not promote its HWND or create extra topmost FX.
         var maple=new WindowInfo(8001,"MapleStory","MapleStory","MapleStory","C:/Games/MapleStory.exe",0,false);
