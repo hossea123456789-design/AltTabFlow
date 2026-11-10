@@ -22,21 +22,32 @@ internal static class GitHubUpdater
     private static bool busy;
     private sealed record Candidate(Version Version,long RunId,long ArtifactId,string? Digest,string Sha);
 
-    public static async Task CheckAndInstallAsync(Form owner,Action exit,Action<string>? report=null)
+    public static void ShowWindow(Action exit,IWin32Window? owner=null)
+    {
+        var existing=Application.OpenForms.OfType<UpdateWindow>().FirstOrDefault();
+        if(existing!=null){existing.Activate();return;}
+        using var dialog=new UpdateWindow(exit);
+        if(owner is Control control&&control.Visible&&!control.IsDisposed)dialog.ShowDialog(owner);
+        else dialog.ShowDialog();
+    }
+
+    public static async Task CheckAndInstallAsync(Form owner,Action exit,Action<string>? report=null,string? suppliedToken=null,CancellationToken cancellation=default)
     {
         if(busy)return;
         busy=true;
         try {
             if(owner.IsDisposed)return;
+            cancellation.ThrowIfCancellationRequested();
             string token=GitHubCredential.Read()??"";
             bool newlyEntered=string.IsNullOrWhiteSpace(token);
-            if(newlyEntered) {
-                token=PromptToken(owner)??"";
-                if(string.IsNullOrWhiteSpace(token))return;
+            if(newlyEntered){
+                token=suppliedToken?.Trim()??"";
+                if(string.IsNullOrWhiteSpace(token))
+                    throw new InvalidOperationException("GitHub 읽기 전용 토큰을 입력한 뒤 확인을 눌러주세요.");
             }
             using var http=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){Timeout=TimeSpan.FromMinutes(7)};
             report?.Invoke("GitHub의 최신 빌드 확인 중...");
-            Candidate update=await GetCandidate(http,token);
+            Candidate update=await GetCandidate(http,token,cancellation);
             if(owner.IsDisposed)return;
             if(newlyEntered)GitHubCredential.Write(token); // store only after successful GitHub API authentication
             Version current=typeof(Program).Assembly.GetName().Version??new Version(0,0);
@@ -50,11 +61,15 @@ internal static class GitHubUpdater
                 return;
             }
             report?.Invoke("업데이트 파일 다운로드 및 검증 중...");
-            var stage=await DownloadAndStage(http,token,update);
+            var stage=await DownloadAndStage(http,token,update,cancellation);
+            cancellation.ThrowIfCancellationRequested();
             if(owner.IsDisposed)return;
             report?.Invoke("새 실행 파일 검증 완료. 프로그램을 다시 시작합니다.");
             UpdateInstaller.Launch(stage,Environment.ProcessPath!,Environment.ProcessId);
             exit(); // clean shutdown restores any temporarily changed Z-order
+        }
+        catch(OperationCanceledException){
+            report?.Invoke("업데이트 확인 또는 다운로드를 취소했습니다.");
         }
         catch(HttpRequestException ex) when(ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.NotFound) {
             // Token may have expired or lack permissions. The next click asks again.
@@ -69,35 +84,17 @@ internal static class GitHubUpdater
         finally {busy=false;}
     }
 
-    private static string? PromptToken(IWin32Window owner)
+    private static async Task<JsonDocument> Json(HttpClient http,string token,string apiPath,CancellationToken cancellation)
     {
-        using var dialog=new Form {
-            Text="GitHub 비공개 저장소 연결 (최초 1회)",StartPosition=FormStartPosition.CenterParent,
-            FormBorderStyle=FormBorderStyle.FixedDialog,ClientSize=new Size(580,226),
-            MinimizeBox=false,MaximizeBox=false,ShowInTaskbar=false
-        };
-        var label=new Label {
-            Text="이 저장소는 비공개입니다. GitHub Fine-grained Personal Access Token을 입력하세요.\n저장소: hossea123456789-design/AltTabFlow\n권한: Contents → Read-only, Actions → Read-only\n토큰은 Windows 자격 증명 관리자에 저장되며 설정 파일/로그에 기록되지 않습니다.",
-            Location=new Point(18,16),Size=new Size(546,112)
-        };
-        var input=new TextBox{Location=new Point(18,137),Width=544,UseSystemPasswordChar=true,PlaceholderText="github_pat_..."};
-        var ok=new Button{Text="연결",DialogResult=DialogResult.OK,Location=new Point(371,179),Size=new Size(90,30)};
-        var cancel=new Button{Text="취소",DialogResult=DialogResult.Cancel,Location=new Point(472,179),Size=new Size(90,30)};
-        dialog.Controls.AddRange(new Control[]{label,input,ok,cancel});dialog.AcceptButton=ok;dialog.CancelButton=cancel;
-        return dialog.ShowDialog(owner)==DialogResult.OK?input.Text.Trim():null;
-    }
-
-    private static async Task<JsonDocument> Json(HttpClient http,string token,string apiPath)
-    {
-        var response=await Send(http,token,new Uri(ApiRoot,apiPath));
+        var response=await Send(http,token,new Uri(ApiRoot,apiPath),cancellation);
         using(response) {
             response.EnsureSuccessStatusCode();
             var stream=await response.Content.ReadAsStreamAsync();
-            return await JsonDocument.ParseAsync(stream);
+            return await JsonDocument.ParseAsync(stream,cancellationToken:cancellation);
         }
     }
 
-    private static async Task<HttpResponseMessage> Send(HttpClient http,string token,Uri url)
+    private static async Task<HttpResponseMessage> Send(HttpClient http,string token,Uri url,CancellationToken cancellation)
     {
         // Redirects to Actions artifact storage must never receive GitHub credentials.
         for(int redirects=0;redirects<6;redirects++) {
@@ -107,7 +104,7 @@ internal static class GitHubUpdater
             message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
             message.Headers.Add("X-GitHub-Api-Version","2022-11-28");
             if(url.Host=="api.github.com")message.Headers.Authorization=new AuthenticationHeaderValue("Bearer",token);
-            var response=await http.SendAsync(message,HttpCompletionOption.ResponseHeadersRead);
+            var response=await http.SendAsync(message,HttpCompletionOption.ResponseHeadersRead,cancellation);
             if(response.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.MovedPermanently or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect) {
                 var location=response.Headers.Location;response.Dispose();
                 if(location==null)throw new InvalidOperationException("업데이트 다운로드 경로가 비어 있습니다.");
@@ -136,19 +133,19 @@ internal static class GitHubUpdater
         return version;
     }
 
-    private static async Task<Candidate> GetCandidate(HttpClient http,string token)
+    private static async Task<Candidate> GetCandidate(HttpClient http,string token,CancellationToken cancellation)
     {
-        using var main=await Json(http,token,$"repos/{Repo}/commits/main");
+        using var main=await Json(http,token,$"repos/{Repo}/commits/main",cancellation);
         string head=main.RootElement.GetProperty("sha").GetString()!;
-        using var runs=await Json(http,token,$"repos/{Repo}/actions/workflows/windows-build.yml/runs?branch=main&status=success&per_page=10");
+        using var runs=await Json(http,token,$"repos/{Repo}/actions/workflows/windows-build.yml/runs?branch=main&status=success&per_page=10",cancellation);
         var run=runs.RootElement.GetProperty("workflow_runs").EnumerateArray()
             .FirstOrDefault(e=>e.GetProperty("head_sha").GetString()==head&&e.GetProperty("conclusion").GetString()=="success");
         if(run.ValueKind==JsonValueKind.Undefined)throw new InvalidOperationException("최신 main 커밋의 Windows 빌드가 아직 성공하지 않았습니다. 프로그램은 현재 버전을 유지합니다.");
         long runId=run.GetProperty("id").GetInt64();
-        using var project=await Json(http,token,$"repos/{Repo}/contents/AltTabFlow.csproj?ref={Uri.EscapeDataString(head)}");
+        using var project=await Json(http,token,$"repos/{Repo}/contents/AltTabFlow.csproj?ref={Uri.EscapeDataString(head)}",cancellation);
         var base64=project.RootElement.GetProperty("content").GetString()!.Replace("\n","").Replace("\r","");
         var version=ParseVersion(Encoding.UTF8.GetString(Convert.FromBase64String(base64)));
-        using var artifacts=await Json(http,token,$"repos/{Repo}/actions/runs/{runId}/artifacts?per_page=100");
+        using var artifacts=await Json(http,token,$"repos/{Repo}/actions/runs/{runId}/artifacts?per_page=100",cancellation);
         var artifact=artifacts.RootElement.GetProperty("artifacts").EnumerateArray()
             .FirstOrDefault(e=>e.GetProperty("name").GetString()==ArtifactName&&!e.GetProperty("expired").GetBoolean());
         if(artifact.ValueKind==JsonValueKind.Undefined)throw new InvalidOperationException("다운로드 가능한 최신 Windows 실행 후보가 아직 없습니다.");
@@ -156,25 +153,26 @@ internal static class GitHubUpdater
         return new(version,runId,artifact.GetProperty("id").GetInt64(),digest,head);
     }
 
-    private static async Task<string> DownloadAndStage(HttpClient http,string token,Candidate candidate)
+    private static async Task<string> DownloadAndStage(HttpClient http,string token,Candidate candidate,CancellationToken cancellation)
     {
         string baseDir=Path.Combine(Preferences.DataDirectory,"updates",Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(baseDir);
         string zip=Path.Combine(baseDir,"candidate.zip");
         try {
-            using(var response=await Send(http,token,new Uri(ApiRoot,$"repos/{Repo}/actions/artifacts/{candidate.ArtifactId}/zip"))) {
+            using(var response=await Send(http,token,new Uri(ApiRoot,$"repos/{Repo}/actions/artifacts/{candidate.ArtifactId}/zip"),cancellation)) {
                 response.EnsureSuccessStatusCode();
                 if(response.Content.Headers.ContentLength is >200_000_000)throw new InvalidDataException("업데이트 ZIP 크기가 허용 범위를 초과했습니다.");
                 await using var read=await response.Content.ReadAsStreamAsync();
                 await using var write=File.Create(zip);
                 var buffer=new byte[81920];long size=0;
-                while(true){int n=await read.ReadAsync(buffer);if(n==0)break;size+=n;if(size>200_000_000)throw new InvalidDataException("업데이트 ZIP이 너무 큽니다.");await write.WriteAsync(buffer.AsMemory(0,n));}
+                while(true){int n=await read.ReadAsync(buffer,cancellation);if(n==0)break;size+=n;if(size>200_000_000)throw new InvalidDataException("업데이트 ZIP이 너무 큽니다.");await write.WriteAsync(buffer.AsMemory(0,n),cancellation);}
             }
             if(candidate.Digest?.StartsWith("sha256:",StringComparison.OrdinalIgnoreCase)==true) {
                 await using var input=File.OpenRead(zip);
-                string hash=Convert.ToHexString(await SHA256.HashDataAsync(input));
+                string hash=Convert.ToHexString(await SHA256.HashDataAsync(input,cancellation));
                 if(!hash.Equals(candidate.Digest[7..],StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("GitHub 아티팩트 SHA-256 확인에 실패했습니다.");
             }
+            cancellation.ThrowIfCancellationRequested();
             using(var archive=ZipFile.OpenRead(zip))UpdateInstaller.ExtractCandidate(archive,baseDir);
             string exe=Path.Combine(baseDir,"AltTabFlow.exe");
             var fileVersion=FileVersionInfo.GetVersionInfo(exe).ProductVersion??"";
