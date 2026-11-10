@@ -1,12 +1,12 @@
-AltTabFlow 1.1.7 / Windows x64
+AltTabFlow 1.1.8 | Windows x64 소스 및 빌드
 
-이 저장소는 1.1.1부터 GitHub에서 이어진 원본 소스와 변경 이력입니다.
-최신 작업 인계: docs/PROJECT_HANDOFF.md
-버전 이력: docs/DEVELOPMENT_HISTORY.md
-사용자 명세 원문: docs/specs/AltTabFlow_1.1.7_갱신내용.md
+주요 변경: 일반 Alt+Tab 마지막 키 해제 통지 누락 복구, 이전 키 상태 정리, 새 일반 제스처의 고정 상태 초기화
+소스 변경: 6개 파일 / 전체 원본 소스·자원 29개.
+검증 기대: 기본206 + UI71 + 실제 Peek10 + 메뉴7 + Focus18(10 중복) = 고유302.
+제공된 원문은 수정본으로 일반 Alt+Tab 2~3회와 Ctrl+Alt+Tab 정상 조작을 확인했다고 보고합니다.
+GitHub CI의 재실행과 개별 Windows/관리자 메이플스토리 환경의 재검증을 분리합니다.
 
-이번 수정: 숨길 앱 Enter 줄바꿈, Ctrl+Alt+Tab 고정, 상단 등록 앱 실제 아이콘 및 폴백.
-기본 161+UI 71+Peek 10+메뉴 7+Focus 18(10 중복)=고유 257개(사용자 명세 내 검증 기록).
-GitHub CI에서 실행한 결과와 Windows 사용자 실기기 검증 결과는 구분해야 합니다.
-압축 해제 후 Windows-Build.cmd 또는 package.ps1로 빌드합니다.
-사용자 설정·창 제목·진단 로그는 GitHub에 올리지 마세요.
+세션 인계 문서: docs/PROJECT_HANDOFF.md
+버전별 이력: docs/DEVELOPMENT_HISTORY.md
+변경 원문: docs/specs/AltTabFlow_1.1.8_갱신내용.md
+빌드: Windows-Build.cmd (실제 Windows PC에서 native 검증 필요)

@@ -1,25 +1,26 @@
 {
-  "version": "1.1.7",
+  "version": "1.1.8",
+  "patchBase": "1.1.7",
+  "changedSourceFiles": 6,
   "sourceFiles": 29,
-  "changedSourceFiles": 9,
-  "patchBase": "1.1.6",
-  "sourcePatch": "docs/specs/AltTabFlow_1.1.7_갱신내용.md",
-  "staticPatchCheck": "PASS (9 exact contextual diffs)",
-  "githubWindowsBuild": "PASS (PR CI 42777258155)",
-  "githubBasic161": "PASS (161/161, CI 42777258155)",
-  "githubUi71": "PASS (71/71, CI 42777258155)",
-  "manualWindowsTests": "NOT_RUN_IN_THIS_SESSION",
-  "handoffReportedPassed": {
-    "basic": 161,
+  "sourcePatch": "docs/specs/AltTabFlow_1.1.8_갱신내용.md",
+  "patchHunks": "Applied with exact context and no conflicts",
+  "githubSourceSHA256": "PENDING",
+  "githubBuild": "PENDING",
+  "githubBasic206": "PENDING",
+  "githubUi71": "PENDING",
+  "githubNativeWindowTests": "NOT_RUN_IN_THIS_SESSION",
+  "sourceReportedTests": {
+    "basic": 206,
+    "ui": 71,
     "peek": 10,
     "menu": 7,
     "focus": 18,
-    "ui": 71,
-    "unique": 257,
-    "overlap": 10
+    "overlap": 10,
+    "unique": 302
   },
-  "handoffNote": "Earlier normal-integrity foreground test failed when elevated MapleStory was foreground; admin full-suite pass reported; must re-verify locally.",
-  "githubSourceSha256": "PASS (manifest check, CI 42777258155)",
-  "githubActualWindowsUiScreenshot": "PASS (main and settings, CI 42777258155)",
-  "mainMergeCommit": "da05572fe9bbd23fcd8bccfdd677805cdfb87582"
+  "sourceReportedUserCheck": "Normal Alt+Tab repeated 2-3 times and Ctrl+Alt+Tab both reported normal after patch (not independently re-run in this session)",
+  "sourceReportedSettingsSha256Unchanged": true,
+  "referenceZipSha256": "7BC446AC0BB43F26EE3E2354DBDC023F34AAC8027C2BBF07C327FFC43CA5650C",
+  "referenceExeSha256": "6ABD2FA306B0106F3D1ED6296A0E0276CD5BE039380CD761D9C0C856F0021F0C"
 }

@@ -38,7 +38,7 @@ jobs:
           dotnet publish .\AltTabFlow.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=true -p:EnableCompressionInSingleFile=false -p:DebugType=None -p:DebugSymbols=false --output .\artifacts\ci-publish
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Test-Path '.\artifacts\ci-publish\AltTabFlow.exe')) { throw 'Missing candidate executable' }
-      - name: Validate input and pinned-session self-tests (161 cases)
+      - name: Validate missed-keyup recovery and input self-tests (206 cases)
         shell: pwsh
         run: |
           $exe = Join-Path (Get-Location) 'artifacts\ci-publish\AltTabFlow.exe'
@@ -48,13 +48,13 @@ jobs:
           $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
           $count = @($report.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
           Write-Host "Basic self tests: $count passed; failures=$($report.failures)"
-          if ($check.ExitCode -ne 0 -or $report.failures -ne 0 -or $count -ne 161) { throw 'Navigation self-test did not pass 161/161' }
+          if ($check.ExitCode -ne 0 -or $report.failures -ne 0 -or $count -ne 206) { throw 'Navigation self-test did not pass 206/206' }
           New-Item -ItemType Directory -Force -Path 'artifacts\ci-tests' | Out-Null
           Copy-Item -LiteralPath $reportPath -Destination 'artifacts\ci-tests\self-test.json'
       - name: Upload basic navigation test report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.7-navigation-self-test
+          name: AltTabFlow-v1.1.8-navigation-self-test
           path: artifacts/ci-tests/self-test.json
           if-no-files-found: error
           retention-days: 30
@@ -74,7 +74,7 @@ jobs:
       - name: Upload UI test report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.7-UI-self-test
+          name: AltTabFlow-v1.1.8-UI-self-test
           path: artifacts/ci-tests/ui-test.json
           if-no-files-found: error
           retention-days: 30
@@ -91,10 +91,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AltTabFlow-actual-Windows-preview
-          path: artifacts/ui-preview/AltTabFlow-1.1.7-actual.png
+          path: artifacts/ui-preview/AltTabFlow-1.1.8-actual.png
           if-no-files-found: error
           retention-days: 30
-      - name: Capture actual 1.1.7 settings UI
+      - name: Capture actual 1.1.8 settings UI
         id: settings-screenshot
         shell: pwsh
         continue-on-error: true
@@ -103,8 +103,8 @@ jobs:
         if: steps.settings-screenshot.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.7-settings-actual-Windows
-          path: artifacts/ui-preview/AltTabFlow-1.1.7-settings-actual.png
+          name: AltTabFlow-v1.1.8-settings-actual-Windows
+          path: artifacts/ui-preview/AltTabFlow-1.1.8-settings-actual.png
           if-no-files-found: error
           retention-days: 30
       - name: Upload candidate for manual Windows validation
