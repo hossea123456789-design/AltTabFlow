@@ -57,6 +57,9 @@ internal sealed class WindowActivation : IDisposable
     private Task<bool>? work;
     private nint target,origin;
     private long started;
+    // Game/maximized-window transitions often take longer than 250ms. Keep
+    // foreground retries bounded and off the UI thread; never loop forever.
+    internal const int ActivationDeadlineMs=850;
     public WindowActivation(){timer.Tick+=(_,_)=>Pump();}
     public void Request(nint hwnd){
         Volatile.Write(ref target,hwnd);origin=Native.GetForegroundWindow();started=Environment.TickCount64;
@@ -66,7 +69,7 @@ internal sealed class WindowActivation : IDisposable
         nint wanted=Volatile.Read(ref target);
         if(wanted==0){timer.Stop();return;}
         nint foreground=Native.GetForegroundWindow();Native.GetWindowThreadProcessId(foreground,out uint pid);
-        if(WindowIdentity.Same(foreground,wanted)||Environment.TickCount64-started>=250||
+        if(WindowIdentity.Same(foreground,wanted)||Environment.TickCount64-started>=ActivationDeadlineMs||
             (foreground!=0&&pid!=Environment.ProcessId&&!WindowIdentity.Same(foreground,origin))){Cancel();return;}
         if(work==null||work.IsCompleted)work=Task.Run(()=>Native.Activate(wanted,()=>Volatile.Read(ref target)==wanted));
     }

@@ -62,6 +62,23 @@
 - 업데이트 버튼은 반드시 **독립된 보이는 Form**을 열고 토큰/취소/오류 상태를 사용자에게 노출. 일시적 `PromptToken` 중첩 모달로 다시 바꾸지 않음.
 - 네트워크 다운로드는 cancellation 지원, 사용자 취소 시 실행 파일 교체/프로세스 종료 금지. 업데이트 교체 성공 경로에서만 종료를 허용.
 
+## 1.1.11 전체화면 게임 오버레이 및 전경 전환 계약
+
+- 최대화된 원래 게임이 `GetForegroundWindow()`에서 다시 전경을 점유해도 **AltTabFlow가 화면을 열어 둔 Alt 제스처 도중에는 즉시 Dismiss하지 않습니다.** 원래 게임이 아닌 다른 앱으로 사용자가 명시적으로 이동할 때만 일반 포커스 해제 절차 적용.
+- `SwitcherForm`의 표시된 HWND만 `HWND_TOPMOST`로 `SWP_NOACTIVATE` 및 제한된 표시 세션에서 재주장. 게임 HWND/대상 HWND의 TopMost 플래그를 영구 변경하지 말 것.
+- `SetForegroundWindow` bool은 실제 활성화 확정과 별개. `GetForegroundWindow`의 owner/root 검증을 확인. 전경 활성화 재시도는 UI 스레드 이외에서 실행하고 짧은 마감 시간(850~900ms)으로 제한.
+- `TargetPeek.Accept`/Z-order 원복은 전환 대상의 실제 foreground 활성화를 확인한 뒤에만 처리. 실패하면 Restore를 수행하고 검사 가능한 로그 남기기.
+- Alt+Enter가 실제 DXGI 독점 전체화면인 경우 WinForms TopMost 오버레이가 항상 위에 표시된다고 보장 불가. 이 제한을 사용자에게 숨기거나 방어적인 anti-cheat 우회 기법을 도입하지 말 것.
+- Chrome/P4 owner popup, 일반 Alt+Tab 마지막 key-up, Ctrl+Alt+Tab 고정 세션, Peek 복원 및 복수 모니터를 반드시 기존 테스트와 함께 재검증.
+
+## 1.1.11 공개 바이너리 배포·인증 계약
+
+- `AltTabFlow` 코드·Actions 원본 소스 저장소는 **Private**, 별도 `AltTabFlow-Downloads`는 **Public (실행 파일 배포 전용)**.
+- 앱은 인증이 필요 없는 공개 GitHub Releases API/바이너리 URL만 호출합니다. 토큰 입력 UI, PAT 저장, 비공개 저장소 API 호출을 다시 도입하지 말 것.
+- 공개 ZIP은 GitHub Release의 `sha256:` digest, 버전 태그와 EXE 자체 파일 버전을 확인. 모호한 릴리스/경로/무결성 오류는 fail closed.
+- 공개 배포 Actions가 원본의 성공 Windows CI를 참조하고 **EXE, 게임 호환 CMD/PS1, 사용법, SHA256SUMS**만 올리며 개인 설정·소스·검사 보고·로그는 공개하지 않음.
+- Public repo/쓰기 범위 최소화된 배포 Secret은 별도 초기 설정이 필요. 실제로 Release가 게시되기 전에는 토큰 없는 업데이트를 출시 완료했다고 주장하면 안 됩니다.
+
 ## 변경 절차
 
 1. 새 요구사항은 버전 패치 원본을 `docs/specs/`에 보관.

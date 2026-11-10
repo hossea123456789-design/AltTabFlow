@@ -1,11 +1,11 @@
-# 테스트·배포 매트릭스 (v1.1.10)
+# 테스트·배포 매트릭스 (v1.1.11)
 
 ## 검사 수
 
 | 검사 | CLI | 1.1.10 기대 수 | CI 자동화 | 실제 Windows 사용자 세션 |
 |---|---|---:|---|---|
 | 기본 키 입력·그룹·고정 세션 | `--self-test` | **206** | ✅ [PR #8 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 206/206 성공 | 별도 재검증 |
-| UI·줄바꿈·아이콘·접근성·휠/업데이트 창 | `--ui-self-test` | **80** | ✅ [PR #8 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 80/80 성공 | 별도 재검증 |
+| UI·줄바꿈·아이콘·접근성·휠/업데이트 창·최대화 게임 오버레이 | `--ui-self-test` | **85** | ✅ [PR #8 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 80/80 성공 | 별도 재검증 |
 | 실제 창 미리 표시/취소 | `--peek-self-test` | **10** | 무인 CI에서 보장 불가 | 필요 |
 | 우클릭 메뉴 생명주기 | `--menu-self-test` | **7** | 무인 CI에서 보장 불가 | 필요 |
 | 전경 권한·지연된 대상 | `--focus-self-test` | **18** | 무인 CI에서 보장 불가 | 필요; Peek 10개와 중복 |
@@ -80,3 +80,16 @@ dotnet build .\AltTabFlow.csproj -c Release
 [PR #8 빌드 #42832500112](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112): SHA-256 매니페스트 일치, .NET 8 Windows 컴파일/self-contained EXE, 기본206/206 + UI80/80 + updater11/11 + startup11/11 = **308/308개** 통과. WinForms **메인·설정·독립 업데이트 창** 실제 화면 캡처, EXE·게임 CMD/PS1 동일 폴더 ZIP 업로드 성공.
 
 **실사용 PC 별도:** 예약 작업 등록/UAC/로그오프 후 로그인 최고 권한 확인, 메이플스토리 후킹/전경, GitHub 읽기 토큰을 통한 실제 다운로드·EXE 교체/롤백, Peek/Menu/Focus 25개 고유 회귀는 이번 무인 CI의 검증 범위가 아님.
+
+## 1.1.11 공개 릴리스/전체화면 메이플 검증
+
+- [ ] CI Windows: `--self-test` 206, `--ui-self-test` 85 (기존80 + 최대화 게임 관련5), `--updater-self-test` 22 (기존11 + 공개 릴리스 정책11), `--startup-self-test` 11 → 총 **324개** 예상
+- [ ] Windows CI .NET 컴파일·소스 SHA-256·실행 파일/게임 스크립트 동봉·메인/설정/토큰 없는 UpdateWindow 실제 캡처
+- [ ] 실제 Alt+Enter 메이플에서 전환기 최상단 표시: 최대화 vs 독점 전체화면 차이 기록. **독점 전체화면에서의 보장은 제외**
+- [ ] 다른 앱 선택 후 실제 `GetForegroundWindow`가 대상(또는 owner popup)인지 검사; Game TopMost를 영구 변경하지 않는지 확인
+- [ ] 게임이 AltTabFlow 표시 직후 포커스를 잠깐 가져가도 일반 제스처 유지, 마지막 키 해제에서 다른 앱 전환 1회만 처리
+- [ ] 전환기 사용자 ESC 취소/Peek/TopMost 복원 및 빠른 2~3회 반복·Ctrl+Alt+Tab 고정
+- [ ] 원본 비공개 유지 확인, 별도 PUBLIC `AltTabFlow-Downloads` 저장소 생성, `ALTTABFLOW_PUBLIC_RELEASE_TOKEN` Secret 최소 권한 및 실제 프리릴리스 발행
+- [ ] 익명 Windows 프로그램 업데이트: 공개 GitHub API → ZIP SHA-256 → EXE 버전 → 안전 교체/백업 → 재시작
+- [ ] 공개 릴리스 누락/404, 토큰 입력 없는 업데이트 창, SHA 오류, 네트워크 취소/쓰기 거부 시 기존 버전 보존
+- [ ] 실제 테스트/로그는 공개 repo에 업로드하지 않음; 25개 고유 Peek/Menu/Focus 물리 회귀 별도

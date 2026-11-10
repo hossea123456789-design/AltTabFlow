@@ -24,6 +24,7 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(nint hwnd);
     [DllImport("user32.dll")] public static extern bool IsWindow(nint hwnd);
     [DllImport("user32.dll")] public static extern bool IsIconic(nint hwnd);
+    [DllImport("user32.dll")] public static extern bool IsZoomed(nint hwnd);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(nint hwnd, StringBuilder text, int count);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(nint hwnd, StringBuilder text, int count);
     [DllImport("user32.dll", EntryPoint="GetWindowLongPtrW")] public static extern nint GetWindowLongPtr(nint hwnd, int index);
@@ -84,8 +85,11 @@ internal static class Native
         var popup = GetLastActivePopup(hwnd);
         if (popup != 0 && IsWindowVisible(popup)) hwnd = popup;
         if (IsIconic(hwnd)) ShowWindowAsync(hwnd, 9);
-        if(SetForegroundWindow(hwnd))return true;
+        bool firstRequest=SetForegroundWindow(hwnd);
+        // SetForegroundWindow returning true is NOT proof the compositor has
+        // finished handing focus from a busy maximized/full-screen game.
         nint foreground=GetForegroundWindow();
+        if(WindowIdentity.Same(foreground,hwnd))return true;
         if(foreground==0||IsHungAppWindow(foreground)||IsHungAppWindow(hwnd))return false;
         // Called by WindowActivation's worker, never the application's GUI.
         // Do not attach our UI thread even when it is the foreground or target.
@@ -96,7 +100,12 @@ internal static class Native
         if(currentRequest!=null&&!currentRequest())return false;
         bool attached=otherPid!=Environment.ProcessId&&current!=other&&AttachThreadInput(current,other,true);
         bool targetAttached=targetPid!=Environment.ProcessId&&targetThread!=current&&targetThread!=other&&AttachThreadInput(current,targetThread,true);
-        try { if(currentRequest!=null&&!currentRequest())return false;BringWindowToTop(hwnd);return SetForegroundWindow(hwnd); }
+        try {
+            if(currentRequest!=null&&!currentRequest())return false;
+            BringWindowToTop(hwnd);
+            bool fallbackRequest=SetForegroundWindow(hwnd);
+            return WindowIdentity.Same(GetForegroundWindow(),hwnd)||firstRequest||fallbackRequest;
+        }
         finally { if(targetAttached)AttachThreadInput(current,targetThread,false);if(attached)AttachThreadInput(current,other,false); }
     }
 }
