@@ -1,14 +1,14 @@
 {
-  "version": "1.1.8",
+  "version": "1.1.9",
   "patchBase": "1.1.7",
   "changedSourceFiles": 6,
   "sourceFiles": 29,
   "sourcePatch": "docs/specs/AltTabFlow_1.1.8_갱신내용.md",
   "patchHunks": "Applied with exact context and no conflicts",
-  "githubSourceSHA256": "PASS (CI #42792830910)",
-  "githubBuild": "PASS (.NET 8 Windows self-contained; CI #42792830910)",
-  "githubBasic206": "PASS (206/206; CI #42792830910)",
-  "githubUi71": "PASS (71/71; CI #42792830910)",
+  "githubSourceSHA256": "PENDING",
+  "githubBuild": "PENDING",
+  "githubBasic206": "PENDING",
+  "githubUi71": "PENDING",
   "githubNativeWindowTests": "NOT_RUN_IN_THIS_SESSION",
   "sourceReportedTests": {
     "basic": 206,
@@ -25,5 +25,11 @@
   "referenceExeSha256": "6ABD2FA306B0106F3D1ED6296A0E0276CD5BE039380CD761D9C0C856F0021F0C",
   "githubActualScreenshots": "PASS (main and settings, CI #42792830910)",
   "mainMergeCommit": "8fca8193761bca80812b20c188350d7e4165f34f",
-  "githubBuiltExeSha256": "8c376e3f0db38e2cdfd2afaac9b9882d8ceecff1d3f2a0d747834407d9c8b658"
+  "githubBuiltExeSha256": "8c376e3f0db38e2cdfd2afaac9b9882d8ceecff1d3f2a0d747834407d9c8b658",
+  "baseVersion": "1.1.8",
+  "githubUpdater11": "PENDING",
+  "elevatedGamePhysicalTest": "NOT_RUN",
+  "fullUpdaterEndToEnd": "NOT_RUN",
+  "privateRepoUpdateMethod": "Authenticated GitHub Actions main success artifact, Windows Credential Manager fine-grained PAT",
+  "candidateArtifactName": "AltTabFlow-win-x64-CANDIDATE"
 }

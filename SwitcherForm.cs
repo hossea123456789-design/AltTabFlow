@@ -501,7 +501,7 @@ internal sealed class SwitcherForm : Form
     public void ShowSettings() {
         persistent=true; configuring=true; HideTargetVisuals(); ShortcutSuppression?.Invoke(true); ClearThumbnails();
         try {
-            using var dialog=new SettingsForm(prefs,catalog.Snapshot);
+            using var dialog=new SettingsForm(prefs,catalog.Snapshot){ExitForUpdate=ExitRequested};
             if(dialog.ShowDialog(this)==DialogResult.OK) { SavePreferences(); ApplyBounds(); ApplyTheme(); group=null; Rebuild(true); }
         } finally { configuring=false; ShortcutSuppression?.Invoke(false); if(Visible) { Activate(); UpdateAura(); Invalidate(); } }
     }

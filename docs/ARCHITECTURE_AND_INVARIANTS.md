@@ -43,6 +43,16 @@
 - 테마형 버튼은 mouse-down이 아닌 같은 hit rectangle 안 mouse-up에서 동작, 밖에서 놓으면 취소. 메뉴는 Closed에서 dispose 금지.
 - 접근성: Tab, Shift+Tab, Space, 키보드 방향키, Ctrl+Tab 페이지 전환, Esc.
 
+## v1.1.9 보안·업데이트 계약
+
+- 일반 실행은 `asInvoker`로 유지하며, 사용자의 명시적인 게임 호환 버튼 입력에만 `runas` 승격을 요청. UAC 취소 시 이전 프로세스 종료 금지.
+- 관리자 인스턴스는 같은 per-user Mutex를 확보하기 위해 기존 프로세스에 정상 `quit`을 요청하고 종료까지 기다림. 강제 종료를 통해 Peek/TopMost 복원을 건너뛰지 않음.
+- EXE 및 `Game-compat-mode.cmd`, `Run-GameCompat.ps1`은 같은 폴더에서 배포.
+- GitHub 비공개 토큰은 Windows Credential Manager에 저장, UI 설정 JSON/원격 로그/소스에 절대 포함하지 않음. Actions·Contents 읽기 이외의 권한을 요구하지 않음.
+- updater는 최신 성공한 `main` 커밋의 아티팩트만 허용하며 버전 상승과 ZIP/실행 파일 검증을 수행, 위험한 경로를 ZIP에서 직접 풀지 않음.
+- 실행 중 EXE를 직접 덮어쓰지 않고 **다른 임시 EXE**가 이전 프로세스 종료 후 백업/교체/재시작. 사용자 설정 경로 유지.
+- 게임 관리자 모드와 자체 업데이트는 **CI 시뮬레이션만으로 전체 UAC·서명·P4·메이플스토리·교체/재실행 성공으로 단정하지 말 것**.
+
 ## 변경 절차
 
 1. 새 요구사항은 버전 패치 원본을 `docs/specs/`에 보관.
