@@ -35,6 +35,26 @@ jobs:
           dotnet publish .\AltTabFlow.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=true -p:EnableCompressionInSingleFile=false -p:DebugType=None -p:DebugSymbols=false --output .\artifacts\ci-publish
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Test-Path '.\artifacts\ci-publish\AltTabFlow.exe')) { throw 'Missing candidate executable' }
+      - name: Validate basic navigation self-tests (117 cases)
+        shell: pwsh
+        run: |
+          $exe = Join-Path (Get-Location) 'artifacts\ci-publish\AltTabFlow.exe'
+          $check = Start-Process -FilePath $exe -ArgumentList '--self-test' -PassThru -Wait -WindowStyle Hidden
+          $reportPath = Join-Path $env:LOCALAPPDATA 'AltTabFlow\self-test.json'
+          if (-not (Test-Path -LiteralPath $reportPath)) { throw 'Missing self-test report' }
+          $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+          $count = @($report.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
+          Write-Host "Basic self tests: $count passed; failures=$($report.failures)"
+          if ($check.ExitCode -ne 0 -or $report.failures -ne 0 -or $count -ne 117) { throw 'Navigation self-test did not pass 117/117' }
+          New-Item -ItemType Directory -Force -Path 'artifacts\ci-tests' | Out-Null
+          Copy-Item -LiteralPath $reportPath -Destination 'artifacts\ci-tests\self-test.json'
+      - name: Upload basic navigation test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltTabFlow-v1.1.5-navigation-self-test
+          path: artifacts/ci-tests/self-test.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Capture actual UI preview on Windows runner
         id: screenshot
         shell: pwsh
@@ -48,7 +68,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AltTabFlow-actual-Windows-preview
-          path: artifacts/ui-preview/AltTabFlow-1.1.4-actual.png
+          path: artifacts/ui-preview/AltTabFlow-1.1.5-actual.png
           if-no-files-found: error
           retention-days: 30
       - name: Upload candidate for manual Windows validation

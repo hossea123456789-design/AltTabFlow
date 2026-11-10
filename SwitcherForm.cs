@@ -213,7 +213,7 @@ internal sealed class SwitcherForm : Form
         if(prefs.HighlightTarget)aura.Select(hwnd,Handle,Accent,prefs.EmphasizeTarget);else aura.Hide();
     }
     private void HideTargetVisuals(){visualTimer.Stop();aura.Hide();dimmer.Hide();peek.Restore();}
-    public void AltReleased(long timestamp=0) { releaseTimestamp=persistent?0:timestamp; if (Visible && !persistent && !configuring && !committing) Choose(); }
+    public void NavigationReleased(long timestamp=0) { releaseTimestamp=persistent?0:timestamp; if (Visible && !persistent && !configuring && !committing) Choose(); }
     public void TogglePersistent() { if (Visible) Dismiss(true); else OpenSwitcher(true, 0); }
     public void Dismiss(bool restore) {
         bool wasCommitting=committing;
@@ -255,7 +255,6 @@ internal sealed class SwitcherForm : Form
     }
     private void ExpandGroup() {
         if (selected >= entries.Count || !entries[selected].IsGroup) return;
-        persistent=true;
         group = entries[selected].Window.GroupKey; selected=page=0;
         updating=true; search.Clear(); updating=false; Rebuild(false);
     }
@@ -269,7 +268,6 @@ internal sealed class SwitcherForm : Form
         NavigateArrow(key);
     }
     private void NavigateArrow(Keys key) {
-        persistent=true;
         int delta;
         if(prefs.View=="목록")delta=key==Keys.Up?-1:key==Keys.Down?1:key==Keys.Left?-(listLayout.Columns>1?listLayout.Rows:1):(listLayout.Columns>1?listLayout.Rows:1);
         else delta=key==Keys.Up?-columns:key==Keys.Down?columns:key==Keys.Left?-1:1;
@@ -282,17 +280,16 @@ internal sealed class SwitcherForm : Form
             Dismiss(true); return true;
         }
         if (key == Keys.Enter) { if (selected<entries.Count&&entries[selected].IsGroup) ExpandGroup(); else Choose(); return true; }
-        if (key == Keys.Back && search.TextLength==0 && !ctrl) { if(group!=null){persistent=true;GoBack();} return true; }
-        if (key == Keys.Home && search.TextLength==0) { persistent=true;selected=0;EnsurePage();UpdateAura();Invalidate();return true; }
-        if (key == Keys.End && search.TextLength==0) { persistent=true;selected=Math.Max(0,entries.Count-1);EnsurePage();UpdateAura();Invalidate();return true; }
+        if (key == Keys.Back && search.TextLength==0 && !ctrl) { if(group!=null)GoBack(); return true; }
+        if (key == Keys.Home && search.TextLength==0) { selected=0;EnsurePage();UpdateAura();Invalidate();return true; }
+        if (key == Keys.End && search.TextLength==0) { selected=Math.Max(0,entries.Count-1);EnsurePage();UpdateAura();Invalidate();return true; }
         if (key == Keys.Tab) { MoveSelection(shift ? -1 : 1); return true; }
         if(key is Keys.Up or Keys.Down or Keys.Left or Keys.Right) {
-            persistent=true;
             if((key is Keys.Left or Keys.Right)&&search.Focused&&search.TextLength>0){Invalidate();return base.ProcessCmdKey(ref msg,keyData);}
             NavigateArrow(key);return true;
         }
-        if (key == Keys.PageDown) { persistent=true;MoveSelection(pageSize); return true; }
-        if (key == Keys.PageUp) { persistent=true;MoveSelection(-pageSize); return true; }
+        if (key == Keys.PageDown) { MoveSelection(pageSize); return true; }
+        if (key == Keys.PageUp) { MoveSelection(-pageSize); return true; }
         if (ctrl && key is Keys.D1 or Keys.D2 or Keys.D3) { SetView(key == Keys.D1 ? "목록" : key == Keys.D2 ? "카드" : "아이콘"); return true; }
         if (ctrl && key == Keys.F) { persistent=true; search.Focus(); search.SelectAll(); Invalidate(); return true; }
         if (ctrl && key == Keys.P) { TogglePin(); return true; }
@@ -369,7 +366,7 @@ internal sealed class SwitcherForm : Form
         hits.Clear(); entryRects.Clear(); desiredThumbs.Clear();
         g.DrawImage(brandIcon,R(23,20,46,46));
         Txt(g,"AltTabFlow",R(74,22,300,30),23,Ink,true);
-        Txt(g,persistent?"상세 선택 · Enter 전환 / Esc 닫기":"빠른 전환 · Alt를 놓으면 전환",R(75,54,470,22),12,persistent?Accent:Muted);
+        Txt(g,persistent?"상세 선택 · Enter 전환 / Esc 닫기":"빠른 전환 · 키를 모두 놓으면 전환",R(75,54,470,22),12,persistent?Accent:Muted);
         Button(g,"설정",R(W-158,31,66,32),ShowSettings,false,"F2 · 보기, 단축키, 제외 목록");
         Button(g,"닫기",R(W-82,31,54,32),()=>Dismiss(true),false,"Esc · 원래 창으로 돌아가기");
         Box(g,R(28,84,W-56,47),Surface,12);
@@ -390,7 +387,7 @@ internal sealed class SwitcherForm : Form
             Txt(g,"검색어를 줄이거나 설정에서 숨긴 앱을 확인해 주세요.",R(60,367,W-120,30),14,Muted,false,false,TextFormatFlags.HorizontalCenter);
         } else if(prefs.View=="목록") PaintList(g); else PaintTiles(g);
         using(var pen=new Pen(Raised)) g.DrawLine(pen,D(28),D(H-61),D(W-28),D(H-61));
-        Txt(g,persistent?"방향키 선택   Enter 펼치기 / 전환   Backspace 뒤로   Esc 닫기":"Tab 다음   Enter 묶음 펼치기   Alt를 놓으면 전환   Ctrl+F 검색",R(28,H-43,W-180,28),12,Muted);
+        Txt(g,persistent?"방향키 선택   Enter 펼치기 / 전환   Backspace 뒤로   Esc 닫기":"Tab·방향키 이동   키를 모두 놓으면 전환   Enter 펼치기   Esc 취소",R(28,H-43,W-180,28),12,Muted);
         int pages=Math.Max(1,(entries.Count+pageSize-1)/pageSize);
         if(pages>1){Button(g,"‹",R(W-149,H-47,29,29),()=>MovePage(-1),false,"이전 페이지");Txt(g,$"{page+1} / {pages}",R(W-115,H-42,52,25),12,Muted,false,false,TextFormatFlags.HorizontalCenter);Button(g,"›",R(W-57,H-47,29,29),()=>MovePage(1),false,"다음 페이지");}
         else Txt(g,"전체 목록",R(W-144,H-42,116,25),12,Accent,false,false,TextFormatFlags.Right);
@@ -504,7 +501,7 @@ internal sealed class SwitcherForm : Form
         entries=entries.Select(x=>new {app=x.Window.AppName,title=x.Window.Title,count=x.Windows.Count,hwnd=x.Window.Handle.ToInt64()}).ToArray()
     };
     // Exercise the real keyboard routing on an off-screen form without moving user windows.
-    internal void PrepareNavigationTest(List<WindowInfo> windows){snapshot=windows;selected=page=0;group=null;persistent=false;Rebuild(false);ApplyBounds();}
+    internal void PrepareNavigationTest(List<WindowInfo> windows,bool pinned=false){snapshot=windows;selected=page=0;group=null;persistent=pinned;Rebuild(false);ApplyBounds();}
     internal bool TestKey(Keys key){var message=Message.Create(Handle,0x100,(nint)(int)key,0);return ProcessCmdKey(ref message,key);}
     internal void TestActivate()=>activation.Request(Handle);
     internal ContextMenuStrip TestItemMenu(int index)=>ShowItemMenu(index,new Point(160,240));
