@@ -108,7 +108,7 @@ internal static class UiTests
         }){
             updater.Show();
             Check("updater has visible persistent dialog",updater.Visible);
-            Check("GitHub token is masked",updater.TokenEntry.UseSystemPasswordChar);
+            Check("updater requires no token input",!updater.Controls.OfType<TextBox>().Any());
             Check("update action is focusable and enabled",updater.CheckUpdate.Enabled&&updater.CheckUpdate.CanFocus);
             updater.Close();
             Check("updater closes without trapping switcher",!updater.Visible);

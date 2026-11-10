@@ -2,25 +2,24 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 
 namespace AltTabFlow;
 
-// This private repository cannot be queried anonymously. The only secret is a
-// fine-grained GitHub PAT with Contents:read and Actions:read for AltTabFlow.
-// It lives in Windows Credential Manager, NEVER in settings.json or logs.
+// PUBLIC BINARY FEED ONLY: source repository stays private.
+// The client never reads its contents, Actions, account data or GitHub tokens.
+// The update ZIP must be attached to a published Release in the dedicated
+// binary-only public repository, and GitHub must provide a SHA-256 asset digest.
 internal static class GitHubUpdater
 {
-    private const string Repo="hossea123456789-design/AltTabFlow";
-    internal const string ArtifactName="AltTabFlow-win-x64-CANDIDATE";
+    internal const string PublicRepo="hossea123456789-design/AltTabFlow-Downloads";
+    internal const string ReleaseAsset="AltTabFlow-win-x64.zip";
+    internal const bool RequiresAuthentication=false;
     private static readonly Uri ApiRoot=new("https://api.github.com/");
     private static bool busy;
-    private sealed record Candidate(Version Version,long RunId,long ArtifactId,string? Digest,string Sha);
+    internal sealed record Candidate(Version Version,Uri DownloadUrl,string Sha256,string Tag,bool Prerelease);
 
     public static void ShowWindow(Action exit,IWin32Window? owner=null)
     {
@@ -31,210 +30,186 @@ internal static class GitHubUpdater
         else dialog.ShowDialog();
     }
 
-    public static async Task CheckAndInstallAsync(Form owner,Action exit,Action<string>? report=null,string? suppliedToken=null,CancellationToken cancellation=default)
+    public static async Task CheckAndInstallAsync(Form owner,Action exit,Action<string>? report=null,CancellationToken cancellation=default)
     {
         if(busy)return;
         busy=true;
         try {
             if(owner.IsDisposed)return;
             cancellation.ThrowIfCancellationRequested();
-            string token=GitHubCredential.Read()??"";
-            bool newlyEntered=string.IsNullOrWhiteSpace(token);
-            if(newlyEntered){
-                token=suppliedToken?.Trim()??"";
-                if(string.IsNullOrWhiteSpace(token))
-                    throw new InvalidOperationException("GitHub 읽기 전용 토큰을 입력한 뒤 확인을 눌러주세요.");
-            }
             using var http=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){Timeout=TimeSpan.FromMinutes(7)};
-            report?.Invoke("GitHub의 최신 빌드 확인 중...");
-            Candidate update=await GetCandidate(http,token,cancellation);
-            if(owner.IsDisposed)return;
-            if(newlyEntered)GitHubCredential.Write(token); // store only after successful GitHub API authentication
+            report?.Invoke("공개 GitHub 릴리스에서 최신 버전 확인 중…");
             Version current=typeof(Program).Assembly.GetName().Version??new Version(0,0);
-            if(update.Version<=current) {
-                report?.Invoke("현재 최신 버전입니다.");
-                MessageBox.Show(owner,$"현재 버전 {current.ToString(3)}\n최신 성공 빌드 {update.Version.ToString(3)}\n\n새 버전이 없습니다.","AltTabFlow 업데이트",MessageBoxButtons.OK,MessageBoxIcon.Information);
+            Candidate? update=await GetCandidate(http,current,cancellation);
+            if(owner.IsDisposed)return;
+            if(update==null){
+                report?.Invoke("현재 최신 버전입니다. GitHub 로그인·토큰 입력은 필요 없습니다.");
+                MessageBox.Show(owner,$"현재 버전: {current.ToString(3)}\n새로운 공개 배포 버전이 없습니다.","AltTabFlow 업데이트",MessageBoxButtons.OK,MessageBoxIcon.Information);
                 return;
             }
-            if(MessageBox.Show(owner,$"현재 {current.ToString(3)} → 최신 {update.Version.ToString(3)}\n\n최신 main 브랜치의 성공한 Windows 실행 후보를 설치합니다. ZIP 압축 해제나 수동 파일 교체는 필요 없습니다.\n\n이 빌드는 Windows 자동 검사 후보이며, 관리자 게임·P4 실사용 검증 완료를 보증하지 않습니다.\n\n다운로드하고 업데이트하시겠습니까?","AltTabFlow 업데이트",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) {
+            if(MessageBox.Show(owner,
+                $"현재 {current.ToString(3)} → 공개 배포 {update.Version.ToString(3)}\n\n" +
+                "GitHub에서 실행 파일만 다운로드합니다. ZIP 압축 해제나 인증 토큰 입력은 필요 없습니다.\n" +
+                "다운로드한 파일의 SHA-256과 EXE 버전 확인 후 교체·재시작합니다.\n\n" +
+                "이 배포본은 Windows 자동 검사를 통과한 후보이며 P4·관리자 게임 실기기 검증을 대신하지 않습니다.\n\n설치하시겠습니까?",
+                "AltTabFlow 자동 업데이트",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes){
                 report?.Invoke("업데이트를 취소했습니다.");
                 return;
             }
-            report?.Invoke("업데이트 파일 다운로드 및 검증 중...");
-            var stage=await DownloadAndStage(http,token,update,cancellation);
+            report?.Invoke("공개 릴리스 파일 다운로드 및 SHA-256 검증 중…");
+            string stage=await DownloadAndStage(http,update,cancellation);
             cancellation.ThrowIfCancellationRequested();
             if(owner.IsDisposed)return;
-            report?.Invoke("새 실행 파일 검증 완료. 프로그램을 다시 시작합니다.");
+            report?.Invoke("무결성 확인 완료. 안전한 교체 후 프로그램을 다시 시작합니다.");
             UpdateInstaller.Launch(stage,Environment.ProcessPath!,Environment.ProcessId);
-            if(owner is UpdateWindow window)window.PermitUpdateExit();
-            exit(); // clean shutdown restores any temporarily changed Z-order
+            if(owner is UpdateWindow dialog)dialog.PermitUpdateExit();
+            exit();
         }
         catch(OperationCanceledException){
-            report?.Invoke("업데이트 확인 또는 다운로드를 취소했습니다.");
+            report?.Invoke("업데이트 확인 또는 다운로드를 취소했습니다. 현재 버전을 유지합니다.");
         }
-        catch(HttpRequestException ex) when(ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.NotFound) {
-            // Token may have expired or lack permissions. The next click asks again.
-            GitHubCredential.Delete();
-            report?.Invoke("GitHub 인증 권한을 확인해야 합니다.");
-            if(!owner.IsDisposed)MessageBox.Show(owner,"비공개 GitHub 저장소 인증에 실패했습니다.\n\n다시 '업데이트 확인'을 누르고 저장소 Contents(읽기) 및 Actions(읽기) 권한이 있는 토큰을 입력해 주세요.\n\n"+ex.Message,"업데이트 인증",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+        catch(HttpRequestException ex) when(ex.StatusCode==HttpStatusCode.NotFound){
+            report?.Invoke("공개 배포 저장소가 아직 생성되지 않았거나 릴리스가 없습니다.");
+            if(!owner.IsDisposed)MessageBox.Show(owner,
+                "실행 파일 전용 공개 GitHub 저장소가 준비되지 않았습니다.\n" +
+                "현재 버전은 유지됩니다. 인증 토큰은 필요하지 않습니다.",
+                "AltTabFlow 공개 배포 대기",MessageBoxButtons.OK,MessageBoxIcon.Information);
         }
-        catch(Exception ex) {
+        catch(Exception ex){
             report?.Invoke("업데이트 실패 — 현재 버전 유지");
-            if(!owner.IsDisposed)MessageBox.Show(owner,"업데이트를 완료하지 못했습니다. 기존 실행본은 유지됩니다.\n"+ex.Message,"AltTabFlow 업데이트",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+            if(!owner.IsDisposed)MessageBox.Show(owner,
+                "자동 업데이트를 완료하지 못했습니다. 기존 실행 파일은 유지됩니다.\n"+ex.Message,
+                "AltTabFlow 업데이트",MessageBoxButtons.OK,MessageBoxIcon.Warning);
         }
         finally {busy=false;}
     }
 
-    private static async Task<JsonDocument> Json(HttpClient http,string token,string apiPath,CancellationToken cancellation)
+    private static async Task<Candidate?> GetCandidate(HttpClient http,Version current,CancellationToken ct)
     {
-        var response=await Send(http,token,new Uri(ApiRoot,apiPath),cancellation);
-        using(response) {
-            response.EnsureSuccessStatusCode();
-            var stream=await response.Content.ReadAsStreamAsync();
-            return await JsonDocument.ParseAsync(stream,cancellationToken:cancellation);
-        }
+        using var response=await Send(http,new Uri(ApiRoot,$"repos/{PublicRepo}/releases?per_page=30"),ct);
+        response.EnsureSuccessStatusCode();
+        await using var stream=await response.Content.ReadAsStreamAsync(ct);
+        using var document=await JsonDocument.ParseAsync(stream,cancellationToken:ct);
+        return SelectCandidate(document.RootElement,current);
     }
 
-    private static async Task<HttpResponseMessage> Send(HttpClient http,string token,Uri url,CancellationToken cancellation)
+    // Only published release objects may be installed. Pre-releases are allowed
+    // because CI builds are explicitly labeled as unverified candidates.
+    internal static Candidate? SelectCandidate(JsonElement releases,Version current)
     {
-        // Redirects to Actions artifact storage must never receive GitHub credentials.
-        for(int redirects=0;redirects<6;redirects++) {
-            if(!ApprovedUrl(url))throw new InvalidOperationException("허용되지 않은 업데이트 다운로드 주소입니다.");
-            using var message=new HttpRequestMessage(HttpMethod.Get,url);
-            message.Headers.UserAgent.ParseAdd("AltTabFlow-Updater/1.1");
-            message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-            message.Headers.Add("X-GitHub-Api-Version","2022-11-28");
-            if(url.Host=="api.github.com")message.Headers.Authorization=new AuthenticationHeaderValue("Bearer",token);
-            var response=await http.SendAsync(message,HttpCompletionOption.ResponseHeadersRead,cancellation);
-            if(response.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.MovedPermanently or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect) {
-                var location=response.Headers.Location;response.Dispose();
-                if(location==null)throw new InvalidOperationException("업데이트 다운로드 경로가 비어 있습니다.");
-                url=location.IsAbsoluteUri?location:new Uri(url,location);
+        if(releases.ValueKind!=JsonValueKind.Array)throw new InvalidDataException("공개 배포 목록 형식이 잘못됐습니다.");
+        Candidate? winner=null;
+        foreach(var release in releases.EnumerateArray()){
+            if(!TryRelease(release,out Candidate? candidate)||candidate==null)continue;
+            if(candidate.Version<=current)continue;
+            if(winner==null||candidate.Version>winner.Version)winner=candidate;
+        }
+        return winner;
+    }
+
+    internal static bool TryRelease(JsonElement release,out Candidate? candidate)
+    {
+        candidate=null;
+        try{
+            if(release.ValueKind!=JsonValueKind.Object||
+               release.GetProperty("draft").GetBoolean())return false;
+            bool prerelease=release.GetProperty("prerelease").GetBoolean();
+            string tag=release.GetProperty("tag_name").GetString()??"";
+            if(!Regex.IsMatch(tag,@"^v\d+\.\d+\.\d+$",RegexOptions.CultureInvariant))return false;
+            if(!Version.TryParse(tag[1..],out Version? version))return false;
+            foreach(var asset in release.GetProperty("assets").EnumerateArray()){
+                if(asset.GetProperty("name").GetString()!=ReleaseAsset)continue;
+                string digest=asset.GetProperty("digest").GetString()??"";
+                if(!Regex.IsMatch(digest,@"^sha256:[a-fA-F0-9]{64}$",RegexOptions.CultureInvariant))return false;
+                string uri=asset.GetProperty("browser_download_url").GetString()??"";
+                if(!Uri.TryCreate(uri,UriKind.Absolute,out var address)||!IsReleaseAssetUrl(address,tag))return false;
+                var bytes=asset.GetProperty("size").GetInt64();
+                if(bytes<1_000_000||bytes>200_000_000)return false;
+                candidate=new Candidate(version,address,digest[7..].ToUpperInvariant(),tag,prerelease);
+                return true;
+            }
+        }catch(ArgumentException){}catch(InvalidOperationException){}catch(FormatException){}catch(OverflowException){}
+        return false;
+    }
+
+    internal static bool IsReleaseAssetUrl(Uri uri,string tag)
+    {
+        if(uri.Scheme!="https"||uri.UserInfo.Length!=0||
+           !string.Equals(uri.Host,"github.com",StringComparison.OrdinalIgnoreCase))return false;
+        string expected=$"/{PublicRepo}/releases/download/{tag}/{ReleaseAsset}";
+        return string.Equals(Uri.UnescapeDataString(uri.AbsolutePath),expected,StringComparison.Ordinal);
+    }
+
+    internal static bool ApprovedRedirect(Uri uri)
+    {
+        if(uri.Scheme!="https"||uri.UserInfo.Length!=0)return false;
+        string host=uri.Host.ToLowerInvariant();
+        return host=="api.github.com"||
+               host=="github.com"||
+               host=="release-assets.githubusercontent.com"||
+               host=="objects.githubusercontent.com"||
+               host=="github-releases.githubusercontent.com"||
+               host.EndsWith(".blob.core.windows.net",StringComparison.Ordinal);
+    }
+
+    private static async Task<HttpResponseMessage> Send(HttpClient http,Uri url,CancellationToken ct)
+    {
+        for(int i=0;i<6;i++){
+            ct.ThrowIfCancellationRequested();
+            if(!ApprovedRedirect(url))throw new InvalidOperationException("허용되지 않은 업데이트 다운로드 주소입니다.");
+            using var request=new HttpRequestMessage(HttpMethod.Get,url);
+            request.Headers.UserAgent.ParseAdd("AltTabFlow-Public-Updater/1.1");
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            // No Authorization header, PAT, GitHub Credential Manager or private repo calls.
+            var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);
+            if(response.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.MovedPermanently
+               or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect){
+                var next=response.Headers.Location;
+                response.Dispose();
+                if(next==null)throw new InvalidDataException("GitHub 업데이트 파일의 다운로드 위치가 없습니다.");
+                url=next.IsAbsoluteUri?next:new Uri(url,next);
                 continue;
             }
             return response;
         }
-        throw new InvalidOperationException("업데이트 다운로드 경로 변경이 너무 많습니다.");
+        throw new InvalidOperationException("GitHub 다운로드 경로 변경이 너무 많습니다.");
     }
 
-    internal static bool ApprovedUrl(Uri uri)
+    private static async Task<string> DownloadAndStage(HttpClient http,Candidate candidate,CancellationToken ct)
     {
-        if(uri.Scheme!="https"||uri.UserInfo.Length!=0)return false;
-        var host=uri.Host.ToLowerInvariant();
-        return host=="api.github.com"||host=="github.com"||
-               host.EndsWith(".githubusercontent.com",StringComparison.Ordinal)||
-               host.EndsWith(".blob.core.windows.net",StringComparison.Ordinal);
-    }
-
-    internal static Version ParseVersion(string xml)
-    {
-        var x=XDocument.Parse(xml);
-        string value=x.Descendants().First(e=>e.Name.LocalName=="Version").Value.Trim();
-        if(!Version.TryParse(value,out var version))throw new InvalidDataException("프로젝트 버전 정보를 확인하지 못했습니다.");
-        return version;
-    }
-
-    private static async Task<Candidate> GetCandidate(HttpClient http,string token,CancellationToken cancellation)
-    {
-        using var main=await Json(http,token,$"repos/{Repo}/commits/main",cancellation);
-        string head=main.RootElement.GetProperty("sha").GetString()!;
-        using var runs=await Json(http,token,$"repos/{Repo}/actions/workflows/windows-build.yml/runs?branch=main&status=success&per_page=10",cancellation);
-        var run=runs.RootElement.GetProperty("workflow_runs").EnumerateArray()
-            .FirstOrDefault(e=>e.GetProperty("head_sha").GetString()==head&&e.GetProperty("conclusion").GetString()=="success");
-        if(run.ValueKind==JsonValueKind.Undefined)throw new InvalidOperationException("최신 main 커밋의 Windows 빌드가 아직 성공하지 않았습니다. 프로그램은 현재 버전을 유지합니다.");
-        long runId=run.GetProperty("id").GetInt64();
-        using var project=await Json(http,token,$"repos/{Repo}/contents/AltTabFlow.csproj?ref={Uri.EscapeDataString(head)}",cancellation);
-        var base64=project.RootElement.GetProperty("content").GetString()!.Replace("\n","").Replace("\r","");
-        var version=ParseVersion(Encoding.UTF8.GetString(Convert.FromBase64String(base64)));
-        using var artifacts=await Json(http,token,$"repos/{Repo}/actions/runs/{runId}/artifacts?per_page=100",cancellation);
-        var artifact=artifacts.RootElement.GetProperty("artifacts").EnumerateArray()
-            .FirstOrDefault(e=>e.GetProperty("name").GetString()==ArtifactName&&!e.GetProperty("expired").GetBoolean());
-        if(artifact.ValueKind==JsonValueKind.Undefined)throw new InvalidOperationException("다운로드 가능한 최신 Windows 실행 후보가 아직 없습니다.");
-        string? digest=artifact.TryGetProperty("digest",out var dg)?dg.GetString():null;
-        return new(version,runId,artifact.GetProperty("id").GetInt64(),digest,head);
-    }
-
-    private static async Task<string> DownloadAndStage(HttpClient http,string token,Candidate candidate,CancellationToken cancellation)
-    {
-        string baseDir=Path.Combine(Preferences.DataDirectory,"updates",Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(baseDir);
-        string zip=Path.Combine(baseDir,"candidate.zip");
-        try {
-            using(var response=await Send(http,token,new Uri(ApiRoot,$"repos/{Repo}/actions/artifacts/{candidate.ArtifactId}/zip"),cancellation)) {
+        string folder=Path.Combine(Preferences.DataDirectory,"updates",Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        string zip=Path.Combine(folder,"candidate.zip");
+        try{
+            using(var response=await Send(http,candidate.DownloadUrl,ct)){
                 response.EnsureSuccessStatusCode();
-                if(response.Content.Headers.ContentLength is >200_000_000)throw new InvalidDataException("업데이트 ZIP 크기가 허용 범위를 초과했습니다.");
-                await using var read=await response.Content.ReadAsStreamAsync();
-                await using var write=File.Create(zip);
-                var buffer=new byte[81920];long size=0;
-                while(true){int n=await read.ReadAsync(buffer,cancellation);if(n==0)break;size+=n;if(size>200_000_000)throw new InvalidDataException("업데이트 ZIP이 너무 큽니다.");await write.WriteAsync(buffer.AsMemory(0,n),cancellation);}
+                if(response.Content.Headers.ContentLength is >200_000_000)
+                    throw new InvalidDataException("업데이트 ZIP 크기가 너무 큽니다.");
+                await using var input=await response.Content.ReadAsStreamAsync(ct);
+                await using var output=File.Create(zip);
+                byte[] buffer=new byte[81920];long bytes=0;
+                while(true){
+                    int n=await input.ReadAsync(buffer,ct);if(n==0)break;
+                    bytes+=n;if(bytes>200_000_000)throw new InvalidDataException("다운로드 한도를 초과했습니다.");
+                    await output.WriteAsync(buffer.AsMemory(0,n),ct);
+                }
             }
-            if(candidate.Digest?.StartsWith("sha256:",StringComparison.OrdinalIgnoreCase)==true) {
-                await using var input=File.OpenRead(zip);
-                string hash=Convert.ToHexString(await SHA256.HashDataAsync(input,cancellation));
-                if(!hash.Equals(candidate.Digest[7..],StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("GitHub 아티팩트 SHA-256 확인에 실패했습니다.");
+            await using(var input=File.OpenRead(zip)){
+                string actual=Convert.ToHexString(await SHA256.HashDataAsync(input,ct));
+                if(!string.Equals(actual,candidate.Sha256,StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("GitHub 릴리스 SHA-256 검증에 실패했습니다. 파일을 교체하지 않습니다.");
             }
-            cancellation.ThrowIfCancellationRequested();
-            using(var archive=ZipFile.OpenRead(zip))UpdateInstaller.ExtractCandidate(archive,baseDir);
-            string exe=Path.Combine(baseDir,"AltTabFlow.exe");
-            var fileVersion=FileVersionInfo.GetVersionInfo(exe).ProductVersion??"";
-            var match=Regex.Match(fileVersion,@"^\d+\.\d+\.\d+(?:\.\d+)?");
-            if(!match.Success||!Version.TryParse(match.Value,out var actual)||actual!=candidate.Version)
-                throw new InvalidDataException($"다운로드 파일의 버전이 GitHub 빌드 버전과 다릅니다 ({fileVersion}).");
-            return baseDir;
-        } catch {try{Directory.Delete(baseDir,true);}catch{}throw;}
+            ct.ThrowIfCancellationRequested();
+            using(var archive=ZipFile.OpenRead(zip))UpdateInstaller.ExtractCandidate(archive,folder);
+            string exe=Path.Combine(folder,"AltTabFlow.exe");
+            string name=FileVersionInfo.GetVersionInfo(exe).ProductVersion??"";
+            var match=Regex.Match(name,@"^\d+\.\d+\.\d+(?:\.\d+)?");
+            if(!match.Success||!Version.TryParse(match.Value,out var actualVersion)||
+               actualVersion!=candidate.Version)
+                throw new InvalidDataException("다운로드한 EXE 버전과 공개 릴리스 버전이 일치하지 않습니다: "+name);
+            return folder;
+        }catch{try{Directory.Delete(folder,true);}catch{}throw;}
     }
-}
-
-internal static class GitHubCredential
-{
-    private const string Target="AltTabFlow/GitHub-Private-Repo-ReadOnly";
-    [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]
-    private struct Credential {
-        public int Flags,Type;
-        public string TargetName,Comment;
-        public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
-        public int CredentialBlobSize;
-        public IntPtr CredentialBlob;
-        public int Persist,AttributeCount;
-        public IntPtr Attributes;
-        public string TargetAlias,UserName;
-    }
-    [DllImport("advapi32.dll",EntryPoint="CredWriteW",CharSet=CharSet.Unicode,SetLastError=true)]
-    private static extern bool CredWrite(ref Credential credential,int flags);
-    [DllImport("advapi32.dll",EntryPoint="CredReadW",CharSet=CharSet.Unicode,SetLastError=true)]
-    private static extern bool CredRead(string target,int type,int flags,out IntPtr credential);
-    [DllImport("advapi32.dll",EntryPoint="CredDeleteW",CharSet=CharSet.Unicode,SetLastError=true)]
-    private static extern bool CredDelete(string target,int type,int flags);
-    [DllImport("advapi32.dll")] private static extern void CredFree(IntPtr credential);
-
-    public static string? Read()
-    {
-        if(!CredRead(Target,1,0,out var ptr))return null;
-        try {
-            var cred=Marshal.PtrToStructure<Credential>(ptr);
-            if(cred.CredentialBlobSize<=0||cred.CredentialBlobSize>5120)return null;
-            var bytes=new byte[cred.CredentialBlobSize];
-            Marshal.Copy(cred.CredentialBlob,bytes,0,bytes.Length);
-            return Encoding.Unicode.GetString(bytes);
-        } finally {CredFree(ptr);}
-    }
-    public static void Write(string token)
-    {
-        byte[] bytes=Encoding.Unicode.GetBytes(token);
-        if(bytes.Length>5120)throw new InvalidOperationException("인증 토큰이 너무 깁니다.");
-        IntPtr data=Marshal.AllocHGlobal(bytes.Length);
-        try {
-            Marshal.Copy(bytes,0,data,bytes.Length);
-            var cred=new Credential {
-                Type=1,TargetName=Target,UserName=Environment.UserName,
-                CredentialBlob=data,CredentialBlobSize=bytes.Length,Persist=2,
-                Comment="Private AltTabFlow GitHub Actions/Contents read-only token",
-                TargetAlias=""
-            };
-            if(!CredWrite(ref cred,0))throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-        } finally {Marshal.FreeHGlobal(data);}
-    }
-    public static void Delete()=>CredDelete(Target,1,0);
 }
 
 // Runs from a temporary COPY of the old EXE and only after old process exit.
@@ -323,11 +298,49 @@ internal static class UpdaterTests
         Test("Version reads from csproj",GitHubUpdater.ParseVersion("<Project><PropertyGroup><Version>1.1.9</Version></PropertyGroup></Project>")==new Version(1,1,9));
         Test("new version exceeds installed",new Version(1,1,9)>new Version(1,1,8));
         Test("equal version is not an update",!(new Version(1,1,8)>new Version(1,1,8)));
-        Test("github API URL accepted",GitHubUpdater.ApprovedUrl(new Uri("https://api.github.com/repos/hossea123456789-design/AltTabFlow")));
-        Test("githubusercontent download URL accepted",GitHubUpdater.ApprovedUrl(new Uri("https://results-receiver.actions.githubusercontent.com/path")));
-        Test("redirect with userinfo rejected",!GitHubUpdater.ApprovedUrl(new Uri("https://user:secret@api.github.com/")));
+        Test("public GitHub API accepted without token",!GitHubUpdater.RequiresAuthentication&&GitHubUpdater.ApprovedRedirect(new Uri("https://api.github.com/repos/hossea123456789-design/AltTabFlow-Downloads/releases")));
+        Test("GitHub release asset CDN accepted",GitHubUpdater.ApprovedRedirect(new Uri("https://release-assets.githubusercontent.com/path")));
+        Test("redirect with userinfo rejected",!GitHubUpdater.ApprovedRedirect(new Uri("https://user:secret@api.github.com/")));
         Test("insecure URL rejected",!GitHubUpdater.ApprovedUrl(new Uri("http://api.github.com/")));
         Test("untrusted redirect host rejected",!GitHubUpdater.ApprovedUrl(new Uri("https://evil.example.com/")));
+        // Public release feed: no credentials, no private repo, fail closed on
+        // digest mismatch or non-release download paths.
+        string ValidRelease(string tag="v1.1.11",bool draft=false,bool prerelease=true,
+            string asset="AltTabFlow-win-x64.zip",string digestPrefix="sha256:",
+            string? href=null){
+            href??=$"https://github.com/{GitHubUpdater.PublicRepo}/releases/download/{tag}/{asset}";
+            return JsonSerializer.Serialize(new{
+                tag_name=tag,draft,prerelease,
+                assets=new[]{new{
+                    name=asset,size=73400320,digest=digestPrefix+new string('a',64),
+                    browser_download_url=href
+                }}
+            });
+        }
+        using(var release=JsonDocument.Parse(ValidRelease())){
+            Test("published public release parsed",GitHubUpdater.TryRelease(release.RootElement,out var candidate)
+                &&candidate!.Version==new Version(1,1,11));
+            Test("public release SHA-256 digest normalized",GitHubUpdater.TryRelease(release.RootElement,out var c)
+                &&c!.Sha256==new string('A',64));
+            Test("prerelease candidate accepted with warning",GitHubUpdater.TryRelease(release.RootElement,out var c)
+                &&c!.Prerelease);
+        }
+        using(var release=JsonDocument.Parse(ValidRelease(draft:true)))
+            Test("draft release rejected",!GitHubUpdater.TryRelease(release.RootElement,out _));
+        using(var release=JsonDocument.Parse(ValidRelease(asset:"Source-code.zip")))
+            Test("wrong asset name rejected",!GitHubUpdater.TryRelease(release.RootElement,out _));
+        using(var release=JsonDocument.Parse(ValidRelease(digestPrefix:"md5:")))
+            Test("missing SHA256 digest rejected",!GitHubUpdater.TryRelease(release.RootElement,out _));
+        using(var release=JsonDocument.Parse(ValidRelease(tag:"v1.1.11-beta")))
+            Test("non-semver tag rejected",!GitHubUpdater.TryRelease(release.RootElement,out _));
+        using(var release=JsonDocument.Parse(ValidRelease(href:"https://evil.example.com/releases/download/v1.1.11/AltTabFlow-win-x64.zip")))
+            Test("untrusted host rejected",!GitHubUpdater.TryRelease(release.RootElement,out _));
+        using(var release=JsonDocument.Parse(ValidRelease(href:"https://github.com/other/repo/releases/download/v1.1.11/AltTabFlow-win-x64.zip")))
+            Test("other repo asset path rejected",!GitHubUpdater.TryRelease(release.RootElement,out _));
+        using(var releases=JsonDocument.Parse("["+ValidRelease("v1.1.11")+","+ValidRelease("v1.1.12")+"]"))
+            Test("highest version selected",GitHubUpdater.SelectCandidate(releases.RootElement,new Version(1,1,10))?.Version==new Version(1,1,12));
+        using(var releases=JsonDocument.Parse("["+ValidRelease("v1.1.11")+"]"))
+            Test("same version never reinstalled",GitHubUpdater.SelectCandidate(releases.RootElement,new Version(1,1,11))==null);
         string temp=Path.Combine(Path.GetTempPath(),"altflow-update-test-"+Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temp);
         try {
