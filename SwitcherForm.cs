@@ -37,7 +37,7 @@ internal sealed class SwitcherForm : Form
     private readonly System.Windows.Forms.Timer commitTimer = new() { Interval = 10 };
     // Used only while the switcher is visible. It does not fight Windows
     // foreground focus for unrelated apps after the user switches away.
-    private const int CommitDeadlineMs=900;
+    internal const int CommitDeadlineMs=900;
     private readonly bool nativeActivation;
     private bool committing, presenting, requestAccepted;
     private nint commitTarget;
@@ -102,7 +102,7 @@ internal sealed class SwitcherForm : Form
             if(!Visible||configuring||InspectionMode)return;
             // A maximized game may immediately reclaim foreground after
             // Show(). Don't close the switcher and lose the user's key-up.
-            if(WindowIdentity.Same(Native.GetForegroundWindow(),origin)){
+            if(ShouldKeepOverlayOnGameFocus(Native.GetForegroundWindow(),origin)){
                 BeginInvoke((Action)(()=>{
                     if(Visible&&!committing&&!configuring)ReassertOverlayZOrder();
                 }));
@@ -120,7 +120,7 @@ internal sealed class SwitcherForm : Form
         };
         refreshUi.Tick += (_, _) => {
             if(Visible&&!configuring&&!committing&&!InspectionMode&&
-               WindowIdentity.Same(Native.GetForegroundWindow(),origin))
+               ShouldKeepOverlayOnGameFocus(Native.GetForegroundWindow(),origin))
                 ReassertOverlayZOrder();
             if (!Visible || configuring || !catalogDirty) return;
             catalogDirty = false;
@@ -137,10 +137,13 @@ internal sealed class SwitcherForm : Form
         =>foreground!=0&&origin!=0&&WindowIdentity.Same(foreground,origin);
     private void ReassertOverlayZOrder(){
         if(!Visible||IsDisposed||InspectionMode)return;
-        // HWND_TOPMOST: remain above the game's topmost band while the
-        // switcher is visible. SWP_NOACTIVATE avoids focus stealing loops.
+        if(!KeepOverlayAboveGame(Handle))
+            AppLog.Write("overlay-topmost-failed",new{win32=System.Runtime.InteropServices.Marshal.GetLastWin32Error()});
+    }
+    internal static bool KeepOverlayAboveGame(nint hwnd){
+        // HWND_TOPMOST without stealing keyboard focus, resizing or moving.
         const uint flags=0x0001|0x0002|0x0010|0x0040;
-        Native.SetWindowPos(Handle,(nint)(-1),0,0,0,0,flags);
+        return Native.SetWindowPos(hwnd,(nint)(-1),0,0,0,0,flags);
     }
     protected override CreateParams CreateParams { get { var p = base.CreateParams; if(!InspectionMode)p.ExStyle |= 0x80; return p; } }
     protected override void OnHandleCreated(EventArgs e) {
@@ -173,7 +176,7 @@ internal sealed class SwitcherForm : Form
         finally{presenting=false;}
         if (pinned) search.Focus(); else ActiveControl = null;
         refreshUi.Start();Invalidate();catalog.RefreshSoon();
-        AppLog.Write("switch-open",new{origin=origin.ToInt64(),root=WindowIdentity.Root(origin).ToInt64(),selected=selected<entries.Count?entries[selected].Window.Handle.ToInt64():0});
+        AppLog.Write("switch-open",new{origin=origin.ToInt64(),root=WindowIdentity.Root(origin).ToInt64(),originMaximized=Native.IsWindow(origin)&&Native.IsZoomed(origin),originTopmost=origin!=0&&((long)Native.GetWindowLongPtr(origin,-20)&8)!=0,selected=selected<entries.Count?entries[selected].Window.Handle.ToInt64():0});
     }
     private void PrepareSwitcher(bool pinned,int direction,bool sameApp) {
         origin = Native.GetForegroundWindow(); monitor = Native.MonitorFromWindow(origin, 2);

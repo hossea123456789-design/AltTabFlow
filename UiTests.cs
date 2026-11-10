@@ -113,6 +113,29 @@ internal static class UiTests
             updater.Close();
             Check("updater closes without trapping switcher",!updater.Visible);
         }
+        // Synthetic maximized/topmost game overlay test: we can validate
+        // Win32 Z-order on a visible desktop without claiming that a DXGI
+        // exclusive-fullscreen/anti-cheat MapleStory session was exercised.
+        var gameOrigin=new Form{ShowInTaskbar=false,TopMost=true,
+            StartPosition=FormStartPosition.Manual,Bounds=new Rectangle(70,80,440,290)};
+        var overlayTest=new Form{ShowInTaskbar=false,TopMost=true,
+            StartPosition=FormStartPosition.Manual,Bounds=new Rectangle(160,120,250,190)};
+        try{
+            overlayTest.Show();gameOrigin.Show();
+            Application.DoEvents();
+            Check("maximized-game foreground reclaims overlay without immediate dismiss",
+                SwitcherForm.ShouldKeepOverlayOnGameFocus(gameOrigin.Handle,gameOrigin.Handle));
+            Check("unrelated foreground does not trigger game overlay protection",
+                !SwitcherForm.ShouldKeepOverlayOnGameFocus(overlayTest.Handle,gameOrigin.Handle));
+            Check("overlay topmost reassertion request succeeds",
+                SwitcherForm.KeepOverlayAboveGame(overlayTest.Handle));
+            Check("game overlay remains topmost without changing game band",
+                overlayTest.TopMost&&gameOrigin.TopMost);
+            Check("fullscreen activation window has bounded retry budget",
+                WindowActivation.ActivationDeadlineMs>=500&&
+                SwitcherForm.CommitDeadlineMs>=WindowActivation.ActivationDeadlineMs&&
+                SwitcherForm.CommitDeadlineMs<=1500);
+        }finally{overlayTest.Close();overlayTest.Dispose();gameOrigin.Close();gameOrigin.Dispose();}
         using(var catalog=new CatalogService())foreach(string view in new[]{"목록","카드","아이콘"}){
             nint activated=0;var prefs=new Preferences{View=view,ColorPreset="rose",ShowPreview=false,HighlightTarget=false,PeekTarget=false,EmphasizeTarget=false};
             using var form=new SwitcherForm(prefs,catalog,h=>{activated=h;return true;}){InspectionMode=true};
