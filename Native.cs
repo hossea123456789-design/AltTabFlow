@@ -38,7 +38,7 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool ShowWindowAsync(nint hwnd, int command);
     [DllImport("user32.dll")] public static extern bool ShowWindow(nint hwnd, int command);
     [DllImport("user32.dll")] public static extern bool BringWindowToTop(nint hwnd);
-    [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint from, uint to, bool attach);
+    [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint from,uint to,bool attach);
     [DllImport("user32.dll")] public static extern bool IsHungAppWindow(nint hwnd);
     [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll",SetLastError=true)] public static extern bool SetWindowPos(nint hwnd,nint after,int x,int y,int w,int h,uint flags);
@@ -75,20 +75,26 @@ internal static class Native
 
     public static string Title(nint hwnd) { var s = new StringBuilder(1024); GetWindowText(hwnd, s, s.Capacity); return s.ToString(); }
     public static string Class(nint hwnd) { var s = new StringBuilder(256); GetClassName(hwnd, s, s.Capacity); return s.ToString(); }
-    public static bool Activate(nint hwnd) {
+    public static bool Activate(nint hwnd,Func<bool>? currentRequest=null) {
+        if(currentRequest!=null&&!currentRequest())return false;
         if (!IsWindow(hwnd)) return false;
         if(GetForegroundWindow()==hwnd)return true;
         var popup = GetLastActivePopup(hwnd);
         if (popup != 0 && IsWindowVisible(popup)) hwnd = popup;
         if (IsIconic(hwnd)) ShowWindowAsync(hwnd, 9);
-        if(SetForegroundWindow(hwnd)) return true;
+        if(SetForegroundWindow(hwnd))return true;
         nint foreground=GetForegroundWindow();
         if(foreground==0||IsHungAppWindow(foreground)||IsHungAppWindow(hwnd))return false;
-        uint current=GetCurrentThreadId(), other=GetWindowThreadProcessId(foreground,out _);
-        uint target=GetWindowThreadProcessId(hwnd,out _);
-        bool attached=current!=other&&AttachThreadInput(current,other,true);
-        bool targetAttached=target!=current&&target!=other&&AttachThreadInput(current,target,true);
-        try { BringWindowToTop(hwnd); return SetForegroundWindow(hwnd); }
-        finally { if(targetAttached)AttachThreadInput(current,target,false); if(attached)AttachThreadInput(current,other,false); }
+        // Called by WindowActivation's worker, never the application's GUI.
+        // Do not attach our UI thread even when it is the foreground or target.
+        if(SendMessageTimeout(foreground,0,0,0,0x22,20,out _)==0)return false;
+        uint current=GetCurrentThreadId(),other=GetWindowThreadProcessId(foreground,out uint otherPid);
+        uint targetThread=GetWindowThreadProcessId(hwnd,out uint targetPid);
+        if(targetPid!=Environment.ProcessId&&SendMessageTimeout(hwnd,0,0,0,0x22,20,out _)==0)return false;
+        if(currentRequest!=null&&!currentRequest())return false;
+        bool attached=otherPid!=Environment.ProcessId&&current!=other&&AttachThreadInput(current,other,true);
+        bool targetAttached=targetPid!=Environment.ProcessId&&targetThread!=current&&targetThread!=other&&AttachThreadInput(current,targetThread,true);
+        try { if(currentRequest!=null&&!currentRequest())return false;BringWindowToTop(hwnd);return SetForegroundWindow(hwnd); }
+        finally { if(targetAttached)AttachThreadInput(current,targetThread,false);if(attached)AttachThreadInput(current,other,false); }
     }
 }

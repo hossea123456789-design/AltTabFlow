@@ -110,3 +110,4 @@ internal sealed class SettingsForm : Form
         }catch(Exception ex){MessageBox.Show(this,"설정을 저장하지 못했습니다.\n"+ex.Message,"AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
     }
 }
+

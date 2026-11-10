@@ -131,3 +131,4 @@ internal sealed class TargetAura : IDisposable
         protected override void Dispose(bool disposing){if(disposing){ReleaseBuffer();foreach(var pen in pens)pen.Dispose();}base.Dispose(disposing);}
     }
 }
+

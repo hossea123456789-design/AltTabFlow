@@ -18,15 +18,17 @@ internal sealed class TargetPeek : IDisposable
         if(!Native.IsWindow(hwnd)||!Native.IsWindowVisible(hwnd)||Native.IsIconic(hwnd)||!Native.IsWindow(switcher))return;
         target=hwnd;chooser=switcher;wasTopmost=Topmost(hwnd);
         previous=Native.GetWindow(hwnd,3);
-        while(previous!=0){
+        var seen=new HashSet<nint>();
+        while(previous!=0&&seen.Count<512&&seen.Add(previous)){
             Native.GetWindowThreadProcessId(previous,out uint pid);
             if(pid!=Environment.ProcessId&&Topmost(previous)==wasTopmost)break;
             previous=Native.GetWindow(previous,3);
         }
+        if(previous!=0&&seen.Count>=512)previous=0;
         // Demoting the root also demotes owned palettes. Remember any that were
         // already topmost so cancellation/commit does not change their setting.
-        nint root=Native.GetAncestor(target,3);
-        Native.EnumWindows((h,_)=>{if(h!=target&&Native.GetAncestor(h,3)==root&&Topmost(h))originallyTopmostOwned.Add(h);return true;},0);
+        nint root=WindowIdentity.Root(target);
+        Native.EnumWindows((h,_)=>{if(h!=target&&WindowIdentity.Root(h)==root&&Topmost(h))originallyTopmostOwned.Add(h);return true;},0);
         Native.GetWindowThreadProcessId(target,out uint targetPid);
         Native.AllowSetForegroundWindow(targetPid);
         // HWND_TOP only raises within the normal band. Position immediately
@@ -87,3 +89,4 @@ internal sealed class TargetDimmer : IDisposable
         protected override void WndProc(ref Message m){if(m.Msg==0x84){m.Result=-1;return;}if(m.Msg==0x21){m.Result=3;return;}base.WndProc(ref m);}
     }
 }
+

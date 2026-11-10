@@ -1,16 +1,19 @@
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text.Json;
+using System.Collections.Concurrent;
 
 namespace AltTabFlow;
 
 internal static class AppLog
 {
     private static readonly object Gate=new();
+    public static bool Suppressed;
     public static void Write(string evt,object data) {
+        if(Suppressed)return;
         // Never block input or rendering for disk I/O.
         ThreadPool.QueueUserWorkItem(_=> {
-            try { lock(Gate) { Directory.CreateDirectory(Preferences.DataDirectory); string path=Path.Combine(Preferences.DataDirectory,"events.jsonl"); if(File.Exists(path)&&new FileInfo(path).Length>1_000_000)File.Move(path,path+".previous",true); File.AppendAllText(path,JsonSerializer.Serialize(new{time=DateTimeOffset.Now,evt,data})+Environment.NewLine); } } catch { }
+            try { lock(Gate) { Directory.CreateDirectory(Preferences.DataDirectory); string path=Path.Combine(Preferences.DataDirectory,"events.jsonl"); if(File.Exists(path)&&new FileInfo(path).Length>1_000_000)File.Move(path,path+".previous",true); File.AppendAllText(path,JsonSerializer.Serialize(new{time=DateTimeOffset.Now,pid=Environment.ProcessId,evt,data})+Environment.NewLine); } } catch { }
         });
     }
 }
@@ -25,10 +28,13 @@ internal static class Program
         Application.ThreadException+=(_,e)=>AppLog.Write("ui-error",new{e.Exception.Message,e.Exception.StackTrace});
         AppDomain.CurrentDomain.UnhandledException+=(_,e)=>AppLog.Write("fatal-error",new{error=e.ExceptionObject.ToString()});
         Directory.CreateDirectory(Preferences.DataDirectory);
+        AppLog.Suppressed=args.Any(x=>x.EndsWith("self-test",StringComparison.Ordinal)||x.EndsWith("fixture",StringComparison.Ordinal));
         if(args.Contains("--self-test")) { SelfTests.Run(); return; }
         if(args.Contains("--peek-self-test")) { PeekTests.Run(); return; }
+        if(args.Contains("--focus-self-test")) { PeekTests.Run(true); return; }
         if(args.Contains("--menu-self-test")) { MenuTests.Run(); return; }
         if(args.Length==2&&args[0]=="--peek-fixture") { PeekTests.RunFixture(args[1]); return; }
+        if(args.Length==2&&args[0]=="--focus-fixture") { PeekTests.RunFocusFixture(args[1]); return; }
         if(args.Contains("--dump")) { File.WriteAllText(Path.Combine(Preferences.DataDirectory,"windows.json"),JsonSerializer.Serialize(WindowCatalog.Read().Select(x=>new{hwnd=x.Handle.ToInt64(),x.Title,x.AppName,x.ProcessName,x.Path,x.Minimized}),new JsonSerializerOptions{WriteIndented=true})); return; }
         using var mutex=new Mutex(true,@"Local\AltTabFlow.CurrentUser."+Environment.UserName,out bool first);
         if(!first) { SendCommand(args.Contains("--quit")?"quit":args.Contains("--status")?"status":args.Contains("--pause")?"pause":args.Contains("--hide")?"hide":"show"); return; }
@@ -52,8 +58,8 @@ internal sealed class SwitcherContext : ApplicationContext
     private readonly SwitcherForm form;
     private readonly NotifyIcon tray;
     private readonly KeyboardHook? keyboard;
-    private readonly Native.WinEventProc foregroundCallback;
-    private readonly nint foregroundHook;
+    private readonly ConcurrentQueue<ShortcutInput> pendingInput=new();
+    private int drainPosted;
     private readonly CancellationTokenSource cancellation=new();
     private bool closing,paused;
     private readonly Queue<object> shortcutHistory=new();
@@ -65,8 +71,7 @@ internal sealed class SwitcherContext : ApplicationContext
         form=new(prefs,catalog);
         if(args.Contains("--preview")||args.Contains("--inspect")) { form.InspectionMode=true; form.ShowInTaskbar=true; }
         _=form.Handle;
-        foregroundCallback=(_,_,hwnd,_,_,_,_)=>form.TrackForeground(hwnd);
-        foregroundHook=Native.SetWinEventHook(3,3,0,foregroundCallback,0,0,2);
+        form.CommitFinished=PostDrain;
         form.PreferencesChanged=()=> { if(keyboard!=null)keyboard.Enabled=prefs.ReplaceAltTab&&!paused&&!form.IsConfiguring; };
         form.ShortcutSuppression=suppress=> { if(keyboard!=null)keyboard.Enabled=prefs.ReplaceAltTab&&!paused&&!suppress; };
         form.ExitRequested=Exit;
@@ -78,7 +83,9 @@ internal sealed class SwitcherContext : ApplicationContext
         menu.Items.Add("완전히 종료 (기본 Alt+Tab 복원)",null,(_,_)=>Exit());
         tray=new NotifyIcon { Icon=CreateIcon(),Text="AltTabFlow · Ctrl+Alt+Space",Visible=true,ContextMenuStrip=menu };
         tray.DoubleClick+=(_,_)=>form.OpenSwitcher(true,0);
-        if(!args.Contains("--preview")) keyboard=new KeyboardHook(command=> { long stamp=Stopwatch.GetTimestamp(); if(!closing&&!form.IsDisposed)try{form.BeginInvoke((Action)(()=> {if(!form.Visible&&command is SwitchCommand.Next or SwitchCommand.Previous or SwitchCommand.SameApp or SwitchCommand.SameAppPrevious or SwitchCommand.Persistent)form.InputTimestamp=stamp;Handle(command);}));}catch(InvalidOperationException){} }) {Enabled=prefs.ReplaceAltTab};
+        if(!args.Contains("--preview")) keyboard=new KeyboardHook(command=> {
+            pendingInput.Enqueue(new(command,Stopwatch.GetTimestamp()));PostDrain();
+        },form.TrackForeground) {Enabled=prefs.ReplaceAltTab};
         _=Listen();
         startupTimer.Tick+=(_,_)=> {
             startupTimer.Stop();
@@ -90,8 +97,28 @@ internal sealed class SwitcherContext : ApplicationContext
         using var stream=typeof(Program).Assembly.GetManifestResourceStream("AltTabFlow.Assets.AltTabFlow.ico");
         using var icon=new Icon(stream!,32,32); return (Icon)icon.Clone();
     }
-    private void Handle(SwitchCommand command) {
+    private void PostDrain() {
+        if(closing||form.IsDisposed||pendingInput.IsEmpty||Interlocked.Exchange(ref drainPosted,1)!=0)return;
+        try{form.BeginInvoke((Action)DrainInput);}catch(InvalidOperationException){Interlocked.Exchange(ref drainPosted,0);}
+    }
+    private void DrainInput() {
+        Interlocked.Exchange(ref drainPosted,0);
+        if(closing)return;
+        while(!form.IsCommitting&&!pendingInput.IsEmpty) {
+            var batch=pendingInput.ToArray();
+            int length=!form.Visible&&!form.IsConfiguring?QuickGesture.Length(batch,0):0;
+            if(length>0) {
+                var gesture=new List<ShortcutInput>();
+                for(int i=0;i<length;i++)if(pendingInput.TryDequeue(out var input))gesture.Add(input);
+                form.QuickSwitch(gesture);continue;
+            }
+            if(pendingInput.TryDequeue(out var next))Handle(next);
+        }
+    }
+    private void Handle(ShortcutInput input) {
         if(closing||form.IsConfiguring) return;
+        var command=input.Command;
+        if(!form.Visible&&command is SwitchCommand.Next or SwitchCommand.Previous or SwitchCommand.PinnedNext or SwitchCommand.PinnedPrevious or SwitchCommand.SameApp or SwitchCommand.SameAppPrevious or SwitchCommand.Persistent)form.InputTimestamp=input.Timestamp;
         shortcutHistory.Enqueue(new{time=DateTimeOffset.Now,command=command.ToString(),visible=form.Visible,persistent=form.IsPersistent});while(shortcutHistory.Count>24)shortcutHistory.Dequeue();
         switch(command) {
             case SwitchCommand.Next: form.OpenSwitcher(false,1); break;
@@ -101,7 +128,7 @@ internal sealed class SwitcherContext : ApplicationContext
             case SwitchCommand.SameApp: form.OpenSwitcher(false,1,true); break;
             case SwitchCommand.SameAppPrevious: form.OpenSwitcher(false,-1,true); break;
             case SwitchCommand.Persistent: form.TogglePersistent(); break;
-            case SwitchCommand.Commit: form.AltReleased(); break;
+            case SwitchCommand.Commit: form.AltReleased(input.Timestamp); break;
             case SwitchCommand.Pause: TogglePause(); break;
             case SwitchCommand.Left: form.DetailedNavigate(Keys.Left); break;
             case SwitchCommand.Right: form.DetailedNavigate(Keys.Right); break;
@@ -136,7 +163,6 @@ internal sealed class SwitcherContext : ApplicationContext
     private void Exit() {
         if(closing)return; closing=true;
         cancellation.Cancel(); startupTimer.Dispose(); keyboard?.Dispose();
-        if(foregroundHook!=0)Native.UnhookWinEvent(foregroundHook);
         tray.Visible=false; tray.Icon?.Dispose(); tray.Dispose(); catalog.Dispose(); form.Shutdown(); ExitThread();
     }
     protected override void Dispose(bool disposing) { if(disposing){Exit();cancellation.Dispose();}base.Dispose(disposing); }
@@ -171,6 +197,35 @@ internal static class SelfTests
         var reverseMru=new[]{sortedRows[5],sortedRows[2],sortedRows[0],sortedRows[1],sortedRows[3],sortedRows[4]};
         Check("다시 AltTab하면 직전 프로그램으로 왕복",mruEntries[WindowCatalog.InitialSelection(mruEntries,reverseMru,15,false,1)].Window.Handle==12);
         Check("영문 다음 항목이 직전 프로그램을 덮어쓰지 않음",lastApp!=1);
+        var history=new ForegroundHistory();
+        history.Record(10,1,100);history.Record(20,2,120);history.Record(30,3,140);
+        Check("실제로 클릭한 창을 기준으로 최근 사용 순서 기록",history.Rank(30,3)>history.Rank(20,2)&&history.Rank(20,2)>history.Rank(10,1));
+        Check("늦게 도착한 포커스 이벤트가 현재 기록을 덮지 않음",!history.Record(10,1,110)&&history.Rank(30,3)>history.Rank(10,1));
+        Check("재사용된 HWND의 다른 프로세스 기록을 섞지 않음",history.Rank(30,99)==0);
+        var wrapHistory=new ForegroundHistory();wrapHistory.Record(10,1,uint.MaxValue-10);
+        Check("시스템 밀리초 카운터 오버플로 뒤에도 순서 유지",wrapHistory.Record(20,2,10)&&wrapHistory.Rank(20,2)>wrapHistory.Rank(10,1));
+        Check("오버플로 이전의 지연 이벤트는 무시",!wrapHistory.Record(10,1,uint.MaxValue-5));
+        using(var owner=new Form())using(var popup=new Form())using(var otherWindow=new Form()) {
+            popup.Owner=owner;_=owner.Handle;_=popup.Handle;_=otherWindow.Handle;
+            result.Add(new{name="owner-fixture",owner=owner.Handle.ToInt64(),popup=popup.Handle.ToInt64(),rootOwner=WindowIdentity.Root(owner.Handle).ToInt64(),rootPopup=WindowIdentity.Root(popup.Handle).ToInt64(),popupOwner=Native.GetWindow(popup.Handle,4).ToInt64()});
+            var ownedRows=new[]{Row((int)owner.Handle,"p4_toolbox","P4 main",0),Row((int)otherWindow.Handle,"Other","other",1)};
+            var ownedEntries=WindowCatalog.Build(ownedRows,new(),"",null,0);
+            int choice=WindowCatalog.InitialSelection(ownedEntries,ownedRows,popup.Handle,false,1);
+            Check("P4 메인 대신 소유 팝업을 클릭해도 다른 프로그램으로 전환",ownedEntries[choice].Window.Handle==otherWindow.Handle);
+            var swappedRows=new[]{ownedRows[0] with{Handle=popup.Handle},ownedRows[1]};
+            var swappedEntries=WindowCatalog.Build(swappedRows,new(),"",null,0);
+            Check("목록에는 팝업이 남고 메인을 클릭한 반대 경우도 전환",swappedEntries[WindowCatalog.InitialSelection(swappedEntries,swappedRows,owner.Handle,false,1)].Window.Handle==otherWindow.Handle);
+            Check("동일 프로세스의 별도 창은 소유 관계 없이 합치지 않음",!WindowIdentity.Same(owner.Handle,otherWindow.Handle));
+            history.Record(WindowIdentity.Root(popup.Handle),(uint)Environment.ProcessId,200);
+            Check("메인과 소유 팝업의 최근 사용 순서를 공유",history.Rank(owner.Handle)==history.Rank(popup.Handle)&&history.Rank(owner.Handle)>0);
+        }
+        ShortcutInput[] Gesture(params SwitchCommand[] values)=>values.Select(x=>new ShortcutInput(x,0)).ToArray();
+        Check("이미 끝난 빠른 AltTab은 UI 생성 없이 전환 가능",QuickGesture.Length(Gesture(SwitchCommand.Next,SwitchCommand.Commit),0)==2);
+        Check("여러 Tab 뒤 Alt 해제도 순서를 보존",QuickGesture.Length(Gesture(SwitchCommand.Next,SwitchCommand.Next,SwitchCommand.Previous,SwitchCommand.Commit),0)==4);
+        Check("방향키가 끼면 빠른 경로를 사용하지 않음",QuickGesture.Length(Gesture(SwitchCommand.Next,SwitchCommand.Right,SwitchCommand.Commit),0)==0);
+        Check("고정 상세 모드는 빠른 경로를 사용하지 않음",QuickGesture.Length(Gesture(SwitchCommand.PinnedNext,SwitchCommand.Commit),0)==0);
+        Check("아직 Alt를 잡고 있으면 선택 화면을 표시",QuickGesture.Length(Gesture(SwitchCommand.Next),0)==0);
+        Check("연속 왕복 제스처는 각각 따로 확정",QuickGesture.Length(Gesture(SwitchCommand.Next,SwitchCommand.Commit,SwitchCommand.Next,SwitchCommand.Commit),0)==2);
         Check("상세 화면은 현재 프로그램 선택으로 시작",mruEntries[WindowCatalog.InitialSelection(mruEntries,mru,12,true,0)].Window.Handle==12);
         Check("포커스 강조와 대상 창 앞으로 보이기 기본 켜짐",new Preferences().EmphasizeTarget&&new Preferences().PeekTarget);
         var sortPrefs=new Preferences{Pinned=new(){"나무","zeta","Alpha"}};

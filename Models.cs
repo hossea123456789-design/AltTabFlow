@@ -137,7 +137,7 @@ internal static class WindowCatalog
             .ThenBy(e => e.Window.Order).ToList();
     }
     internal static int InitialSelection(IReadOnlyList<Entry> entries,IEnumerable<WindowInfo> recency,nint origin,bool pinned,int direction){
-        int current=-1;for(int i=0;i<entries.Count;i++)if(entries[i].Windows.Any(x=>x.Handle==origin)){current=i;break;}
+        int current=-1;for(int i=0;i<entries.Count;i++)if(entries[i].Windows.Any(x=>WindowIdentity.Same(x.Handle,origin))){current=i;break;}
         if(pinned||entries.Count<=1)return Math.Max(0,current);
         var candidates=recency.Select(w=>{for(int i=0;i<entries.Count;i++)if(entries[i].Windows.Any(x=>x.Handle==w.Handle))return i;return -1;}).Where(i=>i>=0&&i!=current).Distinct().ToList();
         if(candidates.Count==0)return Math.Max(0,current);

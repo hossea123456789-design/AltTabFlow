@@ -18,8 +18,7 @@ internal sealed class SwitcherForm : Form
     private string thumbnailSignature = "", lastTip = "";
     private List<WindowInfo> snapshot = new();
     private List<Entry> entries = new();
-    private readonly Dictionary<nint, long> recency = new();
-    private long recencyCounter;
+    private readonly ForegroundHistory recency = new();
     private int selected, page, pageSize = 6, columns = 1;
     private ListLayout listLayout=new(1,6,74,1120,750,false);
     private TileLayout tileLayout=new(3,2,1300,900);
@@ -32,12 +31,21 @@ internal sealed class SwitcherForm : Form
     private double lastPaintMs;
     private readonly Queue<double> paintSamples = new();
     private readonly System.Windows.Forms.Timer refreshUi = new() { Interval = 100 };
+    private readonly System.Windows.Forms.Timer visualTimer = new() { Interval = 16 };
+    private readonly System.Windows.Forms.Timer commitTimer = new() { Interval = 10 };
+    private readonly bool nativeActivation;
+    private bool committing, presenting, requestAccepted;
+    private nint commitTarget;
+    private long commitStarted, releaseTimestamp;
+    public bool IsCommitting=>committing;
+    public Action? CommitFinished;
     private volatile bool catalogDirty;
     private readonly Dictionary<(int Size,bool Bold),Font> fonts=new();
     private readonly Bitmap brandIcon;
     private readonly TargetAura aura=new();
     private readonly TargetPeek peek=new();
     private readonly TargetDimmer dimmer=new();
+    private readonly WindowActivation activation=new();
     public Action? PreferencesChanged;
     public Action<bool>? ShortcutSuppression;
     public Action? ExitRequested;
@@ -63,7 +71,8 @@ internal sealed class SwitcherForm : Form
 
     public SwitcherForm(Preferences prefs, CatalogService catalog,Func<nint,bool>? activateTarget=null) {
         this.prefs = prefs; this.catalog = catalog;
-        this.activateTarget=activateTarget??Native.Activate;
+        this.activateTarget=activateTarget??(h=>{activation.Request(h);return true;});
+        nativeActivation=activateTarget==null;
         using(var stream=typeof(SwitcherForm).Assembly.GetManifestResourceStream("AltTabFlow.Assets.AltTabFlow.ico"))
         using(var icon=new Icon(stream!,48,48)) { brandIcon=icon.ToBitmap(); Icon=(Icon)icon.Clone(); }
         Text = "AltTabFlow · 창 전환"; Name = "AltTabFlow";
@@ -82,7 +91,13 @@ internal sealed class SwitcherForm : Form
             configuring=false;
             if(!forceExit)ShortcutSuppression?.Invoke(false);
         };
-        Deactivate += (_, _) => { if (Visible && !configuring && !InspectionMode) Dismiss(false); };
+        Deactivate += (_, _) => {
+            if(forceExit||presenting)return;
+            if(committing){CheckCommit();return;}
+            if (Visible && !configuring && !InspectionMode) Dismiss(false);
+        };
+        visualTimer.Tick+=(_,_)=>{visualTimer.Stop();if(!committing)ApplyTargetVisuals();};
+        commitTimer.Tick+=(_,_)=>CheckCommit();
         MouseWheel += (_, e) => { persistent=true; if (entries.Count > 0) MoveSelection(e.Delta > 0 ? -1 : 1); };
         refreshUi.Tick += (_, _) => {
             if (!Visible || configuring || !catalogDirty) return;
@@ -106,34 +121,46 @@ internal sealed class SwitcherForm : Form
         if(m.Msg==0x112&&((long)m.WParam&0xFFF0)==0xF100)return;
         base.WndProc(ref m);
     }
-    public void TrackForeground(nint hwnd) {
-        if (hwnd == 0 || hwnd == Handle) return;
+    public void TrackForeground(nint hwnd,uint time) {
+        if (hwnd == 0) return;
         Native.GetWindowThreadProcessId(hwnd, out uint pid);
-        if (pid == Environment.ProcessId) return;
-        recency[hwnd] = ++recencyCounter;
-        if (recency.Count > 512) { var alive = catalog.Snapshot.Select(x => x.Handle).ToHashSet(); foreach (var h in recency.Keys.Where(x => !alive.Contains(x)).ToArray()) recency.Remove(h); }
-        if (!catalog.Snapshot.Any(w => w.Handle == hwnd)) catalog.RefreshSoon();
+        if (pid == 0 || pid == Environment.ProcessId) return;
+        recency.Record(WindowIdentity.Root(hwnd),pid,time);
+        if (!catalog.Snapshot.Any(w => WindowIdentity.Same(w.Handle,hwnd))) catalog.RefreshSoon();
     }
+    public void TrackForeground(nint hwnd)=>TrackForeground(hwnd,unchecked((uint)Environment.TickCount));
     public void OpenSwitcher(bool pinned, int direction = 1, bool sameApp = false) {
-        if (Visible) { persistent |= pinned; Activate(); Native.SetForegroundWindow(Handle); MoveSelection(direction); return; }
+        if(committing)return;
+        if (Visible) { persistent |= pinned; activation.Request(Handle); MoveSelection(direction); return; }
         opening = Stopwatch.StartNew();
+        PrepareSwitcher(pinned,direction,sameApp);
+        ApplyBounds();EnsurePage(); ApplyTheme();
+        presenting=true;
+        try{Show(); Native.ShowWindow(Handle,5); activation.Request(Handle);}
+        finally{presenting=false;}
+        if (pinned) search.Focus(); else ActiveControl = null;
+        refreshUi.Start();Invalidate();catalog.RefreshSoon();
+        AppLog.Write("switch-open",new{origin=origin.ToInt64(),root=WindowIdentity.Root(origin).ToInt64(),selected=selected<entries.Count?entries[selected].Window.Handle.ToInt64():0});
+    }
+    private void PrepareSwitcher(bool pinned,int direction,bool sameApp) {
         origin = Native.GetForegroundWindow(); monitor = Native.MonitorFromWindow(origin, 2);
         TrackForeground(origin);
-        snapshot = catalog.Snapshot.OrderByDescending(w => recency.GetValueOrDefault(w.Handle)).ThenBy(w => w.Order).Select((w,i)=>w with {Order=i}).ToList();
-        group = sameApp ? snapshot.FirstOrDefault(w => w.Handle == origin)?.GroupKey : null;
+        // Filter hidden/closed branch windows without a blocking full enumeration.
+        snapshot = catalog.Snapshot.Where(w=>Native.IsWindow(w.Handle)&&Native.IsWindowVisible(w.Handle)).OrderByDescending(w => recency.Rank(w.Handle)).ThenBy(w => w.Order).Select((w,i)=>w with {Order=i}).ToList();
+        group = sameApp ? snapshot.FirstOrDefault(w => WindowIdentity.Same(w.Handle,origin))?.GroupKey : null;
         persistent = pinned;
         updating = true; search.Clear(); updating = false;
         selected = page = 0;
         Rebuild(false);
-        ApplyBounds();
         selected=WindowCatalog.InitialSelection(entries,snapshot,origin,pinned,direction);
-        EnsurePage(); ApplyTheme();
-        Show(); Native.ShowWindow(Handle,5); Activate(); Native.Activate(Handle);
-        if (pinned) search.Focus(); else ActiveControl = null;
-        refreshUi.Start();
-        Invalidate();
-        // Enumeration and icon extraction stay off the shortcut path.
-        catalog.RefreshSoon();
+    }
+    public void QuickSwitch(IReadOnlyList<ShortcutInput> gesture) {
+        InputTimestamp=gesture[0].Timestamp;
+        var first=gesture[0].Command;
+        PrepareSwitcher(false,first is SwitchCommand.Previous or SwitchCommand.SameAppPrevious?-1:1,first is SwitchCommand.SameApp or SwitchCommand.SameAppPrevious);
+        for(int i=1;i<gesture.Count-1;i++)selected=Mod(selected+(gesture[i].Command is SwitchCommand.Previous or SwitchCommand.SameAppPrevious?-1:1),entries.Count);
+        releaseTimestamp=gesture[^1].Timestamp;
+        Choose();
     }
     private void ApplyBounds() {
         var screen=prefs.OnPrimaryMonitor?(Screen.PrimaryScreen??Screen.FromHandle(origin)):Screen.FromHandle(origin);
@@ -172,29 +199,59 @@ internal sealed class SwitcherForm : Form
     private void EnsurePage() { page = selected / Math.Max(1, pageSize); }
     public void MoveSelection(int offset) { if (entries.Count == 0) return; selected = Mod(selected+offset, entries.Count); EnsurePage(); UpdateAura(); Invalidate(); }
     private void UpdateAura(){
+        visualTimer.Stop();
+        if(!Visible||configuring||committing||selected>=entries.Count){HideTargetVisuals();return;}
+        // A timer is lower priority than queued keyboard commands. Rapid Tabs
+        // coalesce to the last target; Alt-up never waits for another FX repaint.
+        visualTimer.Start();
+    }
+    private void ApplyTargetVisuals(){
         if(!Visible||configuring||selected>=entries.Count){HideTargetVisuals();return;}
         nint hwnd=entries[selected].Window.Handle;
         if(prefs.PeekTarget)peek.Select(hwnd,Handle);else peek.Restore();
         if(prefs.EmphasizeTarget)dimmer.Select(hwnd,Handle);else dimmer.Hide();
         if(prefs.HighlightTarget)aura.Select(hwnd,Handle,Accent,prefs.EmphasizeTarget);else aura.Hide();
     }
-    private void HideTargetVisuals(){aura.Hide();dimmer.Hide();peek.Restore();}
-    public void AltReleased() { if (Visible && !persistent && !configuring) Choose(); }
+    private void HideTargetVisuals(){visualTimer.Stop();aura.Hide();dimmer.Hide();peek.Restore();}
+    public void AltReleased(long timestamp=0) { releaseTimestamp=persistent?0:timestamp; if (Visible && !persistent && !configuring && !committing) Choose(); }
     public void TogglePersistent() { if (Visible) Dismiss(true); else OpenSwitcher(true, 0); }
     public void Dismiss(bool restore) {
+        bool wasCommitting=committing;
+        activation.Cancel();
+        commitTimer.Stop();committing=false;
         refreshUi.Stop(); opening=null; HideTargetVisuals(); ClearThumbnails(); Hide(); persistent=false;
-        if (restore && Native.IsWindow(origin)) Native.Activate(origin);
+        if (restore && Native.IsWindow(origin)) activation.Request(origin);
+        if(wasCommitting)CommitFinished?.Invoke();
     }
     private void Choose() {
         if (selected >= entries.Count) { Dismiss(true); return; }
         var target = entries[selected].Window;
+        committing=true;commitTarget=target.Handle;commitStarted=Stopwatch.GetTimestamp();
+        requestAccepted=false;
         peek.Accept();
         HideTargetVisuals();
-        TrackForeground(target.Handle);
         bool success=activateTarget(target.Handle);
+        requestAccepted=success;
+        if(!committing)return; // Deactivate can confirm synchronously.
+        if(!nativeActivation){FinishCommit(success);return;}
+        CheckCommit();if(committing)commitTimer.Start();
+    }
+    private void CheckCommit() {
+        if(!committing)return;
+        nint foreground=Native.GetForegroundWindow();
+        if(WindowIdentity.Same(foreground,commitTarget)){FinishCommit(true);return;}
+        Native.GetWindowThreadProcessId(foreground,out uint pid);
+        bool external=foreground!=0&&pid!=Environment.ProcessId&&!WindowIdentity.Same(foreground,origin);
+        if(external||!Native.IsWindow(commitTarget)||Stopwatch.GetElapsedTime(commitStarted).TotalMilliseconds>=250){FinishCommit(false);return;}
+        if(!requestAccepted)requestAccepted=activateTarget(commitTarget);
+    }
+    private void FinishCommit(bool confirmed) {
+        if(!committing)return;
+        var data=new {hwnd=commitTarget.ToInt64(),origin=origin.ToInt64(),foreground=Native.GetForegroundWindow().ToInt64(),inputMs=InputTimestamp>0?Math.Round(Stopwatch.GetElapsedTime(InputTimestamp).TotalMilliseconds,2):0,releaseToSwitchMs=releaseTimestamp>0?Math.Round(Stopwatch.GetElapsedTime(releaseTimestamp).TotalMilliseconds,2):0,requestToSwitchMs=Math.Round(Stopwatch.GetElapsedTime(commitStarted).TotalMilliseconds,2)};
+        if(confirmed&&nativeActivation)TrackForeground(Native.GetForegroundWindow());
         Dismiss(false);
-        AppLog.Write(success?"activated":"activate-failed",new {hwnd=target.Handle.ToInt64(),foreground=Native.GetForegroundWindow().ToInt64(),inputMs=InputTimestamp>0?Math.Round(Stopwatch.GetElapsedTime(InputTimestamp).TotalMilliseconds,2):0});
-        InputTimestamp=0;
+        AppLog.Write(confirmed?"activated":"activate-unconfirmed",data);
+        InputTimestamp=releaseTimestamp=0;
     }
     private void ExpandGroup() {
         if (selected >= entries.Count || !entries[selected].IsGroup) return;
@@ -251,7 +308,7 @@ internal sealed class SwitcherForm : Form
         forceExit=true;
         // Close must finish before Dispose; never dispose from Closed itself.
         itemMenu.Close(); itemMenu.Dispose();
-        catalog.Updated-=OnCatalogUpdated; HideTargetVisuals(); ClearThumbnails(); refreshUi.Dispose(); toolTip.Dispose(); Close(); aura.Dispose();dimmer.Dispose();peek.Dispose(); foreach(var font in fonts.Values)font.Dispose(); fonts.Clear(); brandIcon.Dispose();
+        catalog.Updated-=OnCatalogUpdated;activation.Dispose(); HideTargetVisuals(); ClearThumbnails(); refreshUi.Dispose();visualTimer.Dispose();commitTimer.Dispose(); toolTip.Dispose(); Close(); aura.Dispose();dimmer.Dispose();peek.Dispose(); foreach(var font in fonts.Values)font.Dispose(); fonts.Clear(); brandIcon.Dispose();
     }
     private void TogglePin() {
         if (selected >= entries.Count) return; string key=entries[selected].Window.ProcessName;
@@ -342,7 +399,7 @@ internal sealed class SwitcherForm : Form
             lastPaintMs=opening.Elapsed.TotalMilliseconds; paintSamples.Enqueue(lastPaintMs); if(paintSamples.Count>100) paintSamples.Dequeue(); opening=null;
             AppLog.Write("first-paint",new{milliseconds=Math.Round(lastPaintMs,2),keyToPaintMs=InputTimestamp>0?Math.Round(Stopwatch.GetElapsedTime(InputTimestamp).TotalMilliseconds,2):0,windows=snapshot.Count,view=prefs.View});
             // Only schedule the effect after the chooser has actually painted.
-            BeginInvoke((Action)(()=>{if(Visible)UpdateAura();}));
+            UpdateAura();
         }
         base.OnPaint(e);
     }
@@ -412,7 +469,7 @@ internal sealed class SwitcherForm : Form
         thumbnailQueued=true;
         BeginInvoke((Action)(()=> {
             thumbnailQueued=false; ClearThumbnails(false);
-            if(!Visible) return;
+            if(!Visible||committing) return;
             var wanted=desiredThumbs.ToArray();
             thumbnailSignature=string.Join(";",wanted.Select(t=>$"{t.Window.Handle}:{t.Rect}"));
             foreach(var t in wanted) {
@@ -437,7 +494,7 @@ internal sealed class SwitcherForm : Form
         } finally { configuring=false; ShortcutSuppression?.Invoke(false); if(Visible) { Activate(); UpdateAura(); Invalidate(); } }
     }
     public object DiagnosticState() => new {
-        visible=Visible, nativeVisible=Native.IsWindowVisible(Handle), ownHwnd=Handle.ToInt64(), foreground=Native.GetForegroundWindow().ToInt64(), prefs.View, prefs.GroupApps, persistent, selected, page, pageSize,
+        visible=Visible, nativeVisible=Native.IsWindowVisible(Handle), ownHwnd=Handle.ToInt64(), foreground=Native.GetForegroundWindow().ToInt64(),origin=origin.ToInt64(),committing, prefs.View, prefs.GroupApps, persistent, selected, page, pageSize,
         query=search.Text, group, selectedHwnd=selected<entries.Count?entries[selected].Window.Handle.ToInt64():0,
         totalWindows=snapshot.Count, totalEntries=entries.Count, thumbnails=thumbnails.Count,
         lastPaintMs, samples=paintSamples.ToArray(), refreshMs=catalog.LastRefreshMs,
@@ -449,6 +506,7 @@ internal sealed class SwitcherForm : Form
     // Exercise the real keyboard routing on an off-screen form without moving user windows.
     internal void PrepareNavigationTest(List<WindowInfo> windows){snapshot=windows;selected=page=0;group=null;persistent=false;Rebuild(false);ApplyBounds();}
     internal bool TestKey(Keys key){var message=Message.Create(Handle,0x100,(nint)(int)key,0);return ProcessCmdKey(ref message,key);}
+    internal void TestActivate()=>activation.Request(Handle);
     internal ContextMenuStrip TestItemMenu(int index)=>ShowItemMenu(index,new Point(160,240));
     internal (string? Group,int Count,bool Persistent,nint Selected) NavigationState=>(group,entries.Count,persistent,selected<entries.Count?entries[selected].Window.Handle:0);
 }

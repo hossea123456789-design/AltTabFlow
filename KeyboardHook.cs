@@ -43,16 +43,22 @@ internal sealed class KeyboardHook : IDisposable
     private readonly ShortcutRouter router;
     private readonly Thread thread;
     private readonly Native.HookProc callback;
+    private readonly Native.WinEventProc foregroundCallback;
     private readonly ManualResetEventSlim ready = new();
     private nint handle;
+    private nint foregroundHook;
     private uint threadId;
     private Exception? failure;
     private long eventCount, tabCount;
     private bool lastTabAlt, lastTabCtrl;
-    public object Statistics => new {present=handle!=0,alive=thread.IsAlive,events=Interlocked.Read(ref eventCount),tabs=Interlocked.Read(ref tabCount),lastTabAlt,lastTabCtrl};
+    public object Statistics => new {present=handle!=0,foregroundPresent=foregroundHook!=0,alive=thread.IsAlive,events=Interlocked.Read(ref eventCount),tabs=Interlocked.Read(ref tabCount),lastTabAlt,lastTabCtrl};
     public volatile bool Enabled = true;
-    public KeyboardHook(Action<SwitchCommand> post) {
+    public KeyboardHook(Action<SwitchCommand> post,Action<nint,uint>? foreground=null) {
         router = new ShortcutRouter(post); callback = Callback;
+        foregroundCallback=(_,_,hwnd,_,_,_,time)=> {
+            // Delayed notifications describe history, not necessarily current focus.
+            if(hwnd!=0&&hwnd==Native.GetForegroundWindow())foreground?.Invoke(hwnd,time);
+        };
         thread = new Thread(Run) { IsBackground = true, Name = "AltTabFlow shortcuts" };
         thread.Start(); ready.Wait(TimeSpan.FromSeconds(4));
         if (failure != null) throw failure;
@@ -61,11 +67,12 @@ internal sealed class KeyboardHook : IDisposable
     private void Run() {
         threadId = Native.GetCurrentThreadId();
         handle = Native.SetWindowsHookEx(13, callback, Native.GetModuleHandle(null), 0);
+        foregroundHook=Native.SetWinEventHook(3,3,0,foregroundCallback,0,0,2);
         if (handle == 0) failure = new Win32Exception(Marshal.GetLastWin32Error());
         ready.Set();
         if (handle == 0) return;
         try { while (Native.GetMessage(out _, 0, 0, 0) > 0) { } }
-        finally { Native.UnhookWindowsHookEx(handle); handle = 0; }
+        finally { Native.UnhookWindowsHookEx(handle); handle = 0;if(foregroundHook!=0)Native.UnhookWinEvent(foregroundHook);foregroundHook=0; }
     }
     private nint Callback(int code, nint wp, nint lp) {
         if (code < 0) return Native.CallNextHookEx(handle, code, wp, lp);
