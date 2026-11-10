@@ -2,9 +2,9 @@
 
 **세션 간 후속 작업 시작점: [PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md)** · [전체 개발 이력](docs/DEVELOPMENT_HISTORY.md) · [동작 불변 조건](docs/ARCHITECTURE_AND_INVARIANTS.md) · [검증 매트릭스](docs/TEST_MATRIX.md)
 
-Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.11**입니다.
+Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.12**입니다.
 
-> **배포 방식:** 개인 소스 저장소 `AltTabFlow`는 비공개 유지. 전용 공개 저장소 `AltTabFlow-Downloads`의 릴리스에는 실행 파일 ZIP과 SHA-256 정보만 게시하며 앱에서는 토큰 없이 조회·다운로드합니다. **최초 공개 저장소 개설 및 배포 토큰 설치가 완료되기 전에는 공개 업데이트를 사용할 수 없습니다.**
+> **업데이트/배포:** 기존 저장소 `hossea123456789-design/AltTabFlow` 자체가 Public인 경우 같은 저장소의 공개 Releases에서 익명으로 버전과 SHA-256을 확인하고 앱 버튼으로 교체합니다. 별도의 `AltTabFlow-Downloads` 저장소나 배포 PAT는 불필요합니다. **저장소가 Private인 동안은 공개 릴리스를 게시하지 않습니다.**
 
 > **검증 분리:** 첨부된 1.1.8 인계 명세는 기본 206 + UI 71 + Peek 10 + 메뉴 7 + Focus 18(이미 포함된 Peek 10 중복) = **고유 302개 검사 통과**를 보고합니다. GitHub CI에서는 기본 206개+UI 71개를 별도 검증하며, 실제 전경·메뉴·게임 회귀 검사는 구분합니다.
 
@@ -13,6 +13,12 @@ Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전
 Alt+Enter로 확장된 메이플스토리가 최대화 또는 전체화면 상태로 전경을 점유할 경우, AltTabFlow는 다른 TopMost 창보다 더 위에 선택 UI를 표시하도록 Windows HWND_TOPMOST Z-order를 재확인합니다. 원래 게임이 다시 foreground가 되더라도 곧바로 전환기를 닫지 않으며, 다른 앱 선택 시 실제 foreground 활성화를 최대 900ms까지 확인한 후 정리합니다. 미리보기 Z-order 복원은 활성화 확인 뒤로 미룹니다.
 
 **제한:** 진정한 DXGI 독점 전체화면, 게임 보호/안티치트 입력 제한 및 Windows 포커스 정책은 임의 오버레이의 우선순위로 강제할 수 없습니다. 가능하면 게임의 **전체화면 창(테두리 없는 창)** 모드를 사용해 실기기에서 비교하십시오. 게임 창을 강제로 최소화하거나 영구 TopMost 상태를 변경하지 않습니다.
+
+## 공개 저장소 1개로 원클릭 업데이트 (1.1.12)
+
+설정 → 업데이트 확인으로 **같은 공개 GitHub 저장소**의 Releases에서 새로운 Windows EXE를 받습니다. 사용자 GitHub 로그인/PAT는 요구하지 않습니다. 자동 배포는 성공한 Windows CI와 같은 `main` SHA의 실행 파일만 사용하고, `GITHUB_TOKEN`으로 공개 프리릴리스를 생성합니다. 앱은 업로드된 ZIP의 SHA-256과 EXE 버전을 검증하고 재시작합니다.
+
+**최초 공개 전환:** GitHub 관리 권한 보유자가 저장소 Settings → General → Danger Zone → Change repository visibility → Public을 한 번 승인해야 합니다. 자동 배포 워크플로는 Private 상태에서 릴리스를 만들지 않으며, Public 전환 후 Actions → Publish AltTabFlow Release → Run workflow를 한 번 실행하면 됩니다. 저장소 공개는 과거 커밋·이슈·로그까지 공개될 수 있어 사전 점검이 필요합니다.
 
 ## 주요 기능
 

@@ -86,3 +86,10 @@
 3. 핵심 입력/설정/전경 메커니즘을 무심코 변경하지 않고 변경한 계약마다 회귀 검사 추가.
 4. CI 결과와 실기기 테스트 보고서를 별도 기록. PR 병합은 빌드/자동 검사 성공 후.
 5. 실사용 검증 전 **정식 Release/검증 완료 문구 사용 금지**.
+
+## 1.1.12 단일 Public 저장소 불변 조건
+
+- 앱 `PublicRepo`는 `hossea123456789-design/AltTabFlow` 자체를 가리키며 사용자 인증 없이 공개 Releases만 읽습니다.
+- 릴리스 퍼블리셔는 **같은 저장소**의 `github.token`에 `contents:write`/ `actions:read`만 요청. 배포용 PAT/Secret 및 두 번째 저장소를 도입하지 않습니다.
+- Private 상태에서는 공개 릴리스를 절대로 생성하지 않습니다. Public 전환은 GitHub Admin의 명시적 승인 필요.
+- 신규 릴리스는 반드시 `main` 동일 SHA의 성공한 Windows CI 아티팩트에서만 생성. 배포 파일 화이트리스트 4개와 체크섬, 중복 태그 덮어쓰기 금지.

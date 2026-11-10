@@ -1,4 +1,4 @@
-# 테스트·배포 매트릭스 (v1.1.11)
+# 테스트·배포 매트릭스 (v1.1.12)
 
 ## 검사 수
 
@@ -99,3 +99,13 @@ dotnet build .\AltTabFlow.csproj -c Release
 [Windows CI #42842347985](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) **성공**: SHA-256 무결성, Windows .NET 8 컴파일, self-contained EXE 게시, 기본206/206, UI85/85, 공개 업데이트22/22, 관리자 로그인 시작11/11 = 총 **324/324개**. Windows 실제 전환기/설정/업데이트 창 캡처와 EXE+게임 스크립트 동일 폴더 실행 후보 ZIP 업로드 성공. [PR #9 main 병합](https://github.com/hossea123456789-design/AltTabFlow/pull/9).
 
 **아직 미완료:** 공개 다운로드 전용 GitHub 저장소 `AltTabFlow-Downloads` 생성 및 게시 권한 연결, 첫 공개 `v1.1.11` 프리릴리스 발행, 사용자 PC의 Alt+Enter 메이플 게임 포커스 실측, 공개 릴리스 익명 다운로드/실제 EXE 교체·재실행 검증. 공개 배포 기능이 원클릭으로 실제 작동한다고 주장하지 않음.
+
+## 1.1.12 공개 배포 통합 점검
+
+- [ ] Windows CI 기존 206/85/22/11 = 324건 모두 성공
+- [ ] GitHub repo visibility Public로 전환(소유자 승인 필요) 확인
+- [ ] 별도 다운로드 저장소/PAT 없이 동일 repo Release v1.1.12 ZIP+SHA256SUMS 게시
+- [ ] 배포 워크플로가 같은 main SHA의 성공 Windows CI만 사용했는지 확인
+- [ ] 기존 릴리스 덮어쓰기 거부, SHA-256/버전 불일치 시 기존 실행본 유지
+- [ ] 프로그램에서 익명 Release 조회·ZIP 다운로드·백업/교체/재시작 성공
+- [ ] 메이플 Alt+Enter 실기기/독점 전체화면 및 관리자 로그인 재현 여부 별도 확인
