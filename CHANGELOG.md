@@ -1,3 +1,12 @@
+## [1.1.14] - 2026-11-11
+
+### 빠른 Alt+Tab 반복 시 전환창 잔류·후속 먹통 방지
+- 사용자 보고: Alt+Tab을 빠르게 반복하면 선택창이 닫히지 않다가 늦게 닫힌 후 다음 Alt+Tab이 먹통으로 보임.
+- `SwitcherContext.DrainInput`의 무제한 UI 루프와 매 명령 큐 전체 `ToArray()` 복사를 48명령/8ms 분할 FIFO 처리로 교체해 페인트, 키 해제 및 Commit 타이머가 실행될 수 있도록 함.
+- `PostDrain` 중복 BeginInvoke 억제, `CommitFinished` 재진입 및 예외 경로에서 예약 플래그 해제/남은 명령 재예약.
+- 전환창이 실제 foreground일 때 Tab 반복으로 중복 활성화 요청을 다시 시작하지 않음.
+- 기존 1.1.13 메이플 Alt+Enter 및 미리보기 수정 유지. 자동 회귀 목표 206+99+22+11=**338개**. 실제 물리 키 연타·관리자 게임은 CI로 완전 검증 불가.
+
 ## [1.1.13] - 2026-11-11
 
 ### MapleStory Alt+Enter 이후 AltTabFlow 가려짐·미리보기 텍스트 겹침
