@@ -9,6 +9,7 @@ internal sealed class SettingsForm : Form
     private readonly FlowCheck monitor=new(){Text="현재 모니터의 창만 표시",Description="다른 모니터에 열린 창은 목록에서 제외합니다."};
     private readonly FlowCheck primary=new(){Text="항상 주 모니터에 표시",Description="어느 화면에서 호출하든 같은 위치에 나타납니다."};
     private readonly FlowCheck startup=new(){Text="Windows 시작 시 자동 실행",Description="로그인하면 백그라운드에서 실행합니다."};
+    private readonly FlowCheck elevatedStartup=new(){Text="로그인 시 관리자 권한으로 자동 시작",Description="최초 UAC 승인 후 작업 스케줄러로 자동 실행합니다."};
     private readonly FlowCheck highlight=new(){Text="창 테두리 아우라",Description="프리셋의 강조색이 선택한 창 모서리를 빠르게 돕니다."};
     private readonly FlowCheck emphasis=new(){Text="Alt+Tab 포커스 강조",Description="주변을 어둡게 하고 대상 창의 아우라를 강화합니다."};
     private readonly FlowCheck peek=new(){Text="선택한 창을 앞으로 미리 표시",Description="창의 실제 내용을 확인하며 전환할 수 있습니다."};
@@ -55,10 +56,11 @@ internal sealed class SettingsForm : Form
         var display=Card(general,0,74,598,98);LabelAt(display,"기본 보기",18,12,250,23,9,false,true);LabelAt(display,"화면 크기",310,12,250,23,9,false,true);
         mode.Items.AddRange(new object[]{"목록","카드","아이콘"});mode.SelectedItem=prefs.View;Place(display,mode,16,42,272,40);mode.AccessibleName="기본 보기";
         size.Items.AddRange(new object[]{"85%","100%","115%","130%","140%"});size.SelectedItem=prefs.UiScale+"%";if(!size.Items.Contains(prefs.UiScale+"%"))size.SelectedItem="100%";Place(display,size,308,42,272,40);size.AccessibleName="화면 크기";
-        replace.Checked=prefs.ReplaceAltTab;grouped.Checked=prefs.GroupApps;preview.Checked=prefs.ShowPreview;monitor.Checked=prefs.CurrentMonitorOnly;primary.Checked=prefs.OnPrimaryMonitor;startup.Checked=prefs.AutoStartByDefault;
-        var behaviors=Card(general,0,184,598,360);var checks=new[]{replace,grouped,preview,primary,monitor,startup};for(int i=0;i<checks.Length;i++)Place(behaviors,checks[i],8,6+i*58,582,58);
-        LabelAt(general,"Alt+Tab → 방향키로 이동 → 키를 모두 놓으면 전환\nCtrl+Alt+Space로 열면 키를 놓아도 선택 화면을 유지합니다.",4,558,590,46,9,false,true);
-        var maintenance=Card(general,0,618,598,204);
+        replace.Checked=prefs.ReplaceAltTab;grouped.Checked=prefs.GroupApps;preview.Checked=prefs.ShowPreview;monitor.Checked=prefs.CurrentMonitorOnly;primary.Checked=prefs.OnPrimaryMonitor;startup.Checked=prefs.AutoStartByDefault;elevatedStartup.Checked=prefs.ElevatedStartup&&startup.Checked;
+        startup.CheckedChanged+=(_,_)=>{elevatedStartup.Enabled=startup.Checked;if(!startup.Checked)elevatedStartup.Checked=false;};elevatedStartup.Enabled=startup.Checked;
+        var behaviors=Card(general,0,184,598,416);var checks=new[]{replace,grouped,preview,primary,monitor,startup,elevatedStartup};for(int i=0;i<checks.Length;i++)Place(behaviors,checks[i],8,6+i*58,582,58);
+        LabelAt(general,"Alt+Tab → 방향키로 이동 → 키를 모두 놓으면 전환\nCtrl+Alt+Space로 열면 키를 놓아도 선택 화면을 유지합니다.",4,618,590,46,9,false,true);
+        var maintenance=Card(general,0,678,598,218);
         LabelAt(maintenance,"게임 호환 및 업데이트",18,12,555,28,12,true);
         LabelAt(maintenance,GameCompatibility.StatusText,18,44,562,38,9,false,true);
         var gameMode=new FlowButton{Text=GameCompatibility.IsElevated?"관리자 모드 실행 중":"게임 호환: 관리자 권한으로 재시작",AccessibleName="게임 호환 관리자 권한으로 다시 시작"};
@@ -66,11 +68,11 @@ internal sealed class SettingsForm : Form
         var update=new FlowButton{Text="업데이트 확인 · 자동 설치",AccessibleName="GitHub 최신 업데이트 확인 및 설치"};
         Place(maintenance,update,307,87,275,40);
         var updateStatus=LabelAt(maintenance,"비공개 GitHub 연결은 최초 1회 읽기 전용 인증이 필요합니다.",18,140,558,52,9,false,true);
-        update.Click+=async (_,_)=>{
+        update.Click+=(_,_)=>{
             if(PreviewRendering||PreviewOnly)return;
-            update.Enabled=false;
-            try{await GitHubUpdater.CheckAndInstallAsync(this,()=>ExitForUpdate?.Invoke(),s=>{if(!IsDisposed)updateStatus.Text=s;});}
-            finally{if(!IsDisposed)update.Enabled=true;}
+            // Dedicated visible, focusable dialog. Do not run async updater UI
+            // against the shortcut overlay or show a fleeting password popup.
+            GitHubUpdater.ShowWindow(()=>ExitForUpdate?.Invoke(),this);
         };
         var ordering=pages[1];PageHeading(ordering,"상단 정렬","등록한 앱을 먼저, 각 그룹 안에서는 A~Z → 가나다순으로 표시합니다.");
         foreach(var w in windows.GroupBy(x=>x.ProcessName,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()))choices.Add(new(w.ProcessName,w.AppName,w));
@@ -126,8 +128,21 @@ internal sealed class SettingsForm : Form
         }
         return null;
     }
-    private void Save(){try{if(!PreviewOnly)Preferences.StartupEnabled=startup.Checked;ApplyValues();DialogResult=DialogResult.OK;Close();}catch(Exception ex){MessageBox.Show(this,"설정을 저장하지 못했습니다.\n"+ex.Message,"AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
-    private void ApplyValues(){prefs.StartWithWindows=startup.Checked;prefs.View=mode.SelectedItem?.ToString()??"목록";prefs.UiScale=int.Parse((size.SelectedItem?.ToString()??"100%").TrimEnd('%'));prefs.ReplaceAltTab=replace.Checked;prefs.GroupApps=grouped.Checked;prefs.ShowPreview=preview.Checked;prefs.CurrentMonitorOnly=monitor.Checked;prefs.OnPrimaryMonitor=primary.Checked;prefs.ColorPreset=palette.Id;prefs.LightTheme=palette.Light;prefs.HighlightTarget=highlight.Checked;prefs.EmphasizeTarget=emphasis.Checked;prefs.PeekTarget=peek.Checked;prefs.Excluded=Preferences.NormalizeApps(excluded.Text.Split(new[]{'\r','\n',','},StringSplitOptions.RemoveEmptyEntries));prefs.Pinned=apps.CheckedItems.Cast<AppOption>().OrderBy(x=>x.Name,AppNameComparer.Instance).Select(x=>x.Process).ToList();}
+    private void Save(){
+        try{
+            bool wantElevated=ElevatedStartup.UseElevatedTask(startup.Checked,elevatedStartup.Checked);
+            if(!PreviewOnly){
+                bool hasTask=ElevatedStartup.IsInstalled;
+                if(wantElevated!=prefs.ElevatedStartup||
+                   (wantElevated&&!hasTask)||(!wantElevated&&hasTask)){
+                    if(!ElevatedStartup.Configure(this,wantElevated))return; // UAC cancelled: retain existing settings.
+                }
+                Preferences.StartupEnabled=ElevatedStartup.UseRegistryRun(startup.Checked,wantElevated);
+            }
+            ApplyValues();DialogResult=DialogResult.OK;Close();
+        }catch(Exception ex){MessageBox.Show(this,"설정을 저장하지 못했습니다.\n"+ex.Message,"AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+    }
+    private void ApplyValues(){prefs.StartWithWindows=startup.Checked;prefs.ElevatedStartup=startup.Checked&&elevatedStartup.Checked;prefs.View=mode.SelectedItem?.ToString()??"목록";prefs.UiScale=int.Parse((size.SelectedItem?.ToString()??"100%").TrimEnd('%'));prefs.ReplaceAltTab=replace.Checked;prefs.GroupApps=grouped.Checked;prefs.ShowPreview=preview.Checked;prefs.CurrentMonitorOnly=monitor.Checked;prefs.OnPrimaryMonitor=primary.Checked;prefs.ColorPreset=palette.Id;prefs.LightTheme=palette.Light;prefs.HighlightTarget=highlight.Checked;prefs.EmphasizeTarget=emphasis.Checked;prefs.PeekTarget=peek.Checked;prefs.Excluded=Preferences.NormalizeApps(excluded.Text.Split(new[]{'\r','\n',','},StringSplitOptions.RemoveEmptyEntries));prefs.Pinned=apps.CheckedItems.Cast<AppOption>().OrderBy(x=>x.Name,AppNameComparer.Instance).Select(x=>x.Process).ToList();}
     internal void TestPage(int page,ThemePalette? p=null){if(p!=null){palette=p;ApplyColors();}SelectPage(page);}
     internal void TestApplyValues()=>ApplyValues();
     internal Task TestLoadIcons()=>LoadIcons(choices.ToArray());

@@ -75,6 +75,31 @@ internal static class UiTests
         using(var list=new FlowAppList()){
             list.Items.AddRange(new object[]{"Chrome","Slack"});list.SelectedIndex=0;list.TestKey(Keys.Space);Check("Space registers selected app",list.CheckedItems.SequenceEqual(new object[]{"Chrome"}));Check("app registration exposed to accessibility",(list.AccessibilityObject.GetChild(0)!.State&AccessibleStates.Checked)!=0);list.TestKey(Keys.Space);Check("Space unregisters selected app",!list.CheckedItems.Any());
         }
+        // Wheel must move the selection without pinning the plain Alt+Tab session.
+        // Check release via the same SwitcherForm.NavigationReleased path used by
+        // real KeyboardHook, with a fake window activation callback.
+        using(var catalog=new CatalogService()){
+            nint activated=0;
+            var p=new Preferences{View="목록",GroupApps=false,ShowPreview=false,PeekTarget=false,HighlightTarget=false,EmphasizeTarget=false};
+            using(var form=new SwitcherForm(p,catalog,h=>{activated=h;return true;}){InspectionMode=true,TopMost=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
+                form.PrepareNavigationTest(windows,pinned:false);form.Show();
+                form.TestWheel(-120);
+                Check("plain AltTab wheel changes selected target",form.NavigationState.Selected==102);
+                Check("plain AltTab wheel never pins session",!form.NavigationState.Persistent);
+                form.NavigationReleased();
+                Check("plain AltTab wheel commits wheel-selected target on last release",activated==102&&!form.Visible);
+                form.Shutdown();
+            }
+            activated=0;
+            using(var form=new SwitcherForm(p,catalog,h=>{activated=h;return true;}){InspectionMode=true,TopMost=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
+                form.PrepareNavigationTest(windows,pinned:true);form.Show();
+                form.TestWheel(-120);
+                Check("pinned AltTab wheel keeps persistent mode",form.NavigationState.Persistent);
+                form.NavigationReleased();
+                Check("pinned AltTab wheel does not auto-commit on key release",activated==0&&form.Visible);
+                form.Shutdown();
+            }
+        }
         using(var catalog=new CatalogService())foreach(string view in new[]{"목록","카드","아이콘"}){
             nint activated=0;var prefs=new Preferences{View=view,ColorPreset="rose",ShowPreview=false,HighlightTarget=false,PeekTarget=false,EmphasizeTarget=false};
             using var form=new SwitcherForm(prefs,catalog,h=>{activated=h;return true;}){InspectionMode=true};

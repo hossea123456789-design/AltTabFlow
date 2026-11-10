@@ -100,7 +100,12 @@ internal sealed class SwitcherForm : Form
         };
         visualTimer.Tick+=(_,_)=>{visualTimer.Stop();if(!committing)ApplyTargetVisuals();};
         commitTimer.Tick+=(_,_)=>CheckCommit();
-        MouseWheel += (_, e) => { persistent=true; if (entries.Count > 0) MoveSelection(e.Delta > 0 ? -1 : 1); };
+        MouseWheel += (_, e) => {
+            // Wheel is navigation only: it must NOT convert an ordinary Alt+Tab
+            // session to pinned mode. The last key-up still commits selection.
+            if(!Visible||configuring||committing)return;
+            if(entries.Count>0)MoveSelection(e.Delta>0?-1:1);
+        };
         refreshUi.Tick += (_, _) => {
             if (!Visible || configuring || !catalogDirty) return;
             catalogDirty = false;
@@ -519,6 +524,7 @@ internal sealed class SwitcherForm : Form
     internal void PrepareNavigationTest(List<WindowInfo> windows,bool pinned=false){snapshot=windows;selected=page=0;group=null;persistent=pinned;Rebuild(false);ApplyBounds();}
     internal bool TestKey(Keys key){var message=Message.Create(Handle,0x100,(nint)(int)key,0);return ProcessCmdKey(ref message,key);}
     internal void TestMouse(Point point,bool down){var e=new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0);if(down)OnMouseDown(e);else OnMouseUp(e);}
+    internal void TestWheel(int delta)=>OnMouseWheel(new MouseEventArgs(MouseButtons.None,0,Width/2,Height/2,delta));
     internal Rectangle TestEntryBounds(int index)=>entryRects[index];
     internal void TestActivate()=>activation.Request(Handle);
     internal ContextMenuStrip TestItemMenu(int index)=>ShowItemMenu(index,new Point(160,240));

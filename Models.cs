@@ -20,6 +20,7 @@ internal sealed class Preferences
     public bool EmphasizeTarget { get; set; } = true;
     public bool PeekTarget { get; set; } = true;
     public bool? StartWithWindows { get; set; }
+    public bool ElevatedStartup { get; set; } = false;
     public bool AutoStartByDefault => StartWithWindows ?? true;
     public int UiScale { get; set; } = 100;
     public List<string> Pinned { get; set; } = new();
