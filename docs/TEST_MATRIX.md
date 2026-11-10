@@ -1,11 +1,11 @@
-# 테스트·배포 매트릭스 (v1.1.12)
+# 테스트·배포 매트릭스 (v1.1.13)
 
 ## 검사 수
 
 | 검사 | CLI | 1.1.11 기대 수 | CI 자동화 | 실제 Windows 사용자 세션 |
 |---|---|---:|---|---|
 | 기본 키 입력·그룹·고정 세션 | `--self-test` | **206** | ✅ [PR #9 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) 206/206 성공 | 별도 재검증 |
-| UI·줄바꿈·아이콘·접근성·휠/업데이트 창·최대화 게임 오버레이 | `--ui-self-test` | **85** | ✅ [PR #9 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) 85/85 성공 | 별도 재검증 |
+| UI·줄바꿈·아이콘·접근성·휠/업데이트 창·최대화 게임 오버레이 | `--ui-self-test` | **96** | ✅ [PR #9 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) 85/85 성공 | 별도 재검증 |
 | 실제 창 미리 표시/취소 | `--peek-self-test` | **10** | 무인 CI에서 보장 불가 | 필요 |
 | 우클릭 메뉴 생명주기 | `--menu-self-test` | **7** | 무인 CI에서 보장 불가 | 필요 |
 | 전경 권한·지연된 대상 | `--focus-self-test` | **18** | 무인 CI에서 보장 불가 | 필요; Peek 10개와 중복 |
@@ -117,3 +117,13 @@ dotnet build .\AltTabFlow.csproj -c Release
 - [x] [공개 릴리스 게시 Actions #42850768898](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42850768898) 성공; [v1.1.12 ZIP + SHA256SUMS](https://github.com/hossea123456789-design/AltTabFlow/releases/tag/v1.1.12) 실제 게시
 - [ ] 사용자 PC 실제 MapleStory Alt+Enter 독점 전체화면/포커스 전환
 - [ ] 차기 버전으로 앱 버튼의 다운로드·EXE 교체·재시작 종단간 실사용
+
+## 1.1.13 실사용 회귀 체크
+
+- [ ] CI 기본206/206 · UI96/96 · updater22/22 · 관리자 로그인11/11 = **335/335**
+- [ ] 실제 Alt+Enter로 확대된 MapleStory 화면에서 **메이플 항목을 선택으로 거친 뒤** Alt 유지 + Tab 연속 2~5회 동안 AltTabFlow 화면이 사라지지 않음
+- [ ] 전환기 내부 MapleStory **DWM 썸네일** 유지, 게임 HWND를 미리보기 효과로 임시 topmost 승격하지 않음
+- [ ] 다른 앱의 기존 Peek/Dim/Aura 유지 및 전환 대상 선택에 의한 실제 전경 창 활성화 확인
+- [ ] Ctrl+Alt+Tab 고정, Alt 마지막 키 release Commit, 휠 탐색, Esc 취소, F2 설정, P4·Chrome 그룹 회귀
+- [ ] UI scale 85~140%와 다양한 화면 높이에서 **타이틀/하단 버튼** 겹침 및 글자 줄바꿈 없음
+- [ ] 독점 전체화면은 Windows 임의 TopMost overlay 보장 불가능함을 사용자가 인지하도록 기록
