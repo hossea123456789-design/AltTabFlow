@@ -100,6 +100,18 @@ internal static class UiTests
                 form.Shutdown();
             }
         }
+        // The update UI must remain independently visible and dismissible. An
+        // update check must not require ESC to unstick the Alt+Tab switcher.
+        using(var updater=new UpdateWindow(()=>{}){
+            StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000),ShowInTaskbar=false
+        }){
+            updater.Show();
+            Check("updater has visible persistent dialog",updater.Visible);
+            Check("GitHub token is masked",updater.TokenEntry.UseSystemPasswordChar);
+            Check("update action is focusable and enabled",updater.CheckUpdate.Enabled&&updater.CheckUpdate.CanFocus);
+            updater.Close();
+            Check("updater closes without trapping switcher",!updater.Visible);
+        }
         using(var catalog=new CatalogService())foreach(string view in new[]{"목록","카드","아이콘"}){
             nint activated=0;var prefs=new Preferences{View=view,ColorPreset="rose",ShowPreview=false,HighlightTarget=false,PeekTarget=false,EmphasizeTarget=false};
             using var form=new SwitcherForm(prefs,catalog,h=>{activated=h;return true;}){InspectionMode=true};

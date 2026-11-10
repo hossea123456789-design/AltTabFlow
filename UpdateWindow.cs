@@ -20,7 +20,8 @@ internal sealed class UpdateWindow : Form
         Text="닫기",Location=new Point(490,270),Size=new Size(122,38)
     };
     private CancellationTokenSource? operation;
-    private bool working;
+    private bool working,allowUpdateExit;
+    internal void PermitUpdateExit()=>allowUpdateExit=true;
 
     internal UpdateWindow(Action exit)
     {
@@ -83,7 +84,7 @@ internal sealed class UpdateWindow : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if(working){
+        if(working&&!allowUpdateExit){
             e.Cancel=true;
             operation?.Cancel();
             status.Text="취소 중입니다...";

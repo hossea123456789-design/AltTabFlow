@@ -66,6 +66,7 @@ internal static class GitHubUpdater
             if(owner.IsDisposed)return;
             report?.Invoke("새 실행 파일 검증 완료. 프로그램을 다시 시작합니다.");
             UpdateInstaller.Launch(stage,Environment.ProcessPath!,Environment.ProcessId);
+            if(owner is UpdateWindow window)window.PermitUpdateExit();
             exit(); // clean shutdown restores any temporarily changed Z-order
         }
         catch(OperationCanceledException){
