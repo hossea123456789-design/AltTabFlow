@@ -2,6 +2,26 @@
 
 이 파일은 사용자 제공 1.1.1 완전 명세, 1.1.2·1.1.4·1.1.5·1.1.6·1.1.7·1.1.8 변경 명세를 기준으로 작성했습니다.
 
+## [1.1.11] - 2026-11-10
+
+### 메이플스토리 Alt+Enter 확장 후 가려짐/전경 전환 실패
+- 사용자 증상: 확장된/최대화된 메이플에서 Alt+Tab하면 AltTabFlow UI가 게임 뒤로 사라지고, 다른 앱을 선택해도 메이플이 전경을 점유
+- 관찰된 코드 문제: `SwitcherForm.Deactivate`가 원래 게임의 재활성화에 곧바로 화면을 닫고, `Choose`가 전환 대상이 실제 foreground가 되기 전에 Peek Z-order를 복구함
+- `Native.Activate`는 `SetForegroundWindow` 성공 반환을 실제 전경 전환과 구분하지 않았으며 작업자 재시도/Commit 확인 제한은 각각 250ms로 짧았음
+- 표시 단계의 `HWND_TOPMOST` 재주장(화면 표시 중, `SWP_NOACTIVATE`), 원래 게임이 포커스를 다시 잡아도 선택 화면 유지, 무관한 다른 앱이 전경을 차지하면 기존 해제 처리 유지
+- 활성화 후 GetForegroundWindow/owner-root 확인, 제한된 활성화 재시도(850ms)/Commit 확인(900ms), 대상 활성화 확정 이후 Peek Z-order 복원
+- 게임 전체화면(Alt+Enter)이 DXGI **독점 전체화면**이라면 일반 WinForms/TopMost 오버레이가 표시된다는 보장은 없음. 테두리 없는 전체화면 창 방식 비교 필요. 게임 창 강제 최소화/영구 TopMost 수정은 적용하지 않음
+- UI 신규 Z-order/시뮬레이션 5개 검사(기존80→85), 메이플 물리 키/실제 DXGI 모드 재현은 별도
+
+### GitHub 토큰 없는 자동 업데이트
+- 소스 저장소 `hossea123456789-design/AltTabFlow`는 **비공개 유지**
+- 별도 공개 `AltTabFlow-Downloads` 저장소의 Releases API에서 최신 게시 버전·ZIP SHA-256 digest를 읽고 HTTPS 익명 다운로드/버전 검증/EXE 교체
+- 사용자 PAT 입력/Windows Credential Manager 접근·비공개 GitHub API 호출 제거, 업데이트 화면에는 인증 입력 대신 공개 배포 상황과 오류 표시
+- 공개 배포 워크플로는 비공개 Windows CI 전체 성공에 연동. 공개로 올라가는 것은 **EXE+게임 실행 스크립트+사용법을 담은 ZIP** 및 체크섬뿐이며 소스/테스트/개인 설정 제외
+- 한 번의 초기 설정: 공개 저장소 생성 및 소스 저장소 Actions Secret `ALTTABFLOW_PUBLIC_RELEASE_TOKEN`(대상 repo Contents:RW), 실제 공개 배포까지 수행해야 익명 업데이트 가능
+- 공개 Release 레코드의 version/asset/digest 검증 11개 추가, 업데이터 자체 검사 기존11→22. CI 목표: 입력206+UI85+Updater22+Startup11 = **324개**
+- 사용자 Windows 종단 간 업데이트, 작업 스케줄러, 메이플/P4 테스트는 별도
+
 ## [1.1.10] - 2026-11-10
 
 ### 사용자 요청: 매번 관리자 전환·사라지는 업데이트 창·휠 전환 수정

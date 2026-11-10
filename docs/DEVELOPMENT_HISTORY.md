@@ -6,6 +6,7 @@
 
 | 버전 | 요청/구현의 핵심 | 테스트 수 (중복 제외, 명세 기록) | GitHub에서 별도 검증한 범위 |
 |---|---|---:|---|
+| **1.1.11** | 메이플 Alt+Enter 확장 후 TopMost 전환기가 가려지고 포커스가 게임에 잔류하는 회귀: 전환기 Z-order 재주장, 기원 게임이 포커스를 되잡더라도 즉시 해제 금지, Peek 복구를 실제 포커스 확인 뒤로 지연, 850/900ms 제한 시간. 소스는 비공개 유지, 공개 바이너리 저장소의 Releases를 인증 없이 자동 조회/무결성 검증 | 입력206+UI85+Updater22+Startup11=CI 목표324 | 실제 GitHub CI는 최신 PR 확인. 메이플 실기기/독점 전체화면/온라인 업데이트와 공개 저장소·배포 권한 초기 설정은 별도 |
 | **1.1.10** | 관리자 자동 시작을 Run 키에서 Task Scheduler Interactive/Highest로 전환, Program Files 보호 설치; 업데이트 창 사라짐·ESC 복구 보고에 대응해 독립 화면/취소 UI; 휠 강제 persistent 버그 제거 | 기본206+UI80+Updater11+Startup11=CI 목표308; Peek/Menu/Focus 추가25 | [PR #8](https://github.com/hossea123456789-design/AltTabFlow/pull/8), [Windows CI 308개 + 3종 실제 UI 캡처 성공](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112), [main 병합](https://github.com/hossea123456789-design/AltTabFlow/commit/0841c00da08fa5287e971197894dfd2987b4ac14). UAC·로그인·게임·온라인 업데이트 실기기 검증은 별도 |
 | 1.1.1 | 원본 완전 명세와 복원 스크립트, WinForms 25파일, MRU·Peek·테마·게임 호환 | 기본 72 + Peek 10 | Linux 작업 환경에서 소스·SHA 검증. Windows EXE 생성/실동작 재검증은 하지 않음 |
 | 1.1.2 | ContextMenuStrip Closed/Dispose 생명주기 오류 수정, 초기화/런타임 오류 분리, 메뉴 7개 검사 | 89 (72+10+7) | 소스/패치 복원 후 비공개 GitHub 저장소 최초 등록. 초기 Windows CI 컴파일+실제 UI screenshot 성공 |
