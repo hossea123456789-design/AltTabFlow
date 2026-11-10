@@ -17,6 +17,8 @@ Before editing code in any new session, read and respect these repository-owned 
 - v1.1.8 invariants: reconcile stale *unintercepted* key records only; never infer intercepted Tab/arrow releases from async zero; 16ms hook timer only during active sessions; no duplicate Commit; do not inherit pinned state when a plain gesture starts.
 - Never hide/convert failed focus tests to passing: the documented normal-permission versus elevated MapleStory foreground conflict must remain recorded.
 - Maintain `.gitattributes` LF source policy and validate `SOURCE-SHA256.txt` on updates.
+- v1.1.9: in-app update fetches only latest successful main GitHub Actions candidate, verifying ZIP SHA-256 and executable version; private repo PAT (Contents/Actions:read) goes to Windows Credential Manager, never settings/logs. Updater helper replaces EXE only after old process exits.
+- v1.1.9: game mode UAC must be approved before the original process is told to quit; token takeover across ordinary/elevated singleton must be tested on a real Windows PC. Candidate archive must keep EXE/game scripts in a single folder.
 - No unverified production `v1.1.x` release or tag. Candidate EXEs and screenshots are not proof of all native tests.
 - Do not commit `settings.json`, user window titles, process paths, private diagnostic logs, account secrets or personal machine configuration.
 

@@ -6,7 +6,8 @@
 
 - 저장소: [hossea123456789-design/AltTabFlow](https://github.com/hossea123456789-design/AltTabFlow) (**Private**)
 - 기본 브랜치: `main`; 변경은 `update/vX.Y.Z-...` 브랜치와 Pull Request로 진행.
-- **현재 `main`: 1.1.8**, 소스 병합 커밋 [`8fca819`](https://github.com/hossea123456789-design/AltTabFlow/commit/8fca8193761bca80812b20c188350d7e4165f34f) ([PR #6](https://github.com/hossea123456789-design/AltTabFlow/pull/6)). 새 세션에서는 최신 `main` HEAD와 PR/Actions를 다시 확인하세요.
+- **1.1.9 관리자 게임·자동 업데이트 변경은 PR #7 브랜치에서 검증 중입니다.** 실제 `main` 병합 여부와 CI는 최신 GitHub에서 재확인하십시오.
+- **직전 `main`: 1.1.8**, 소스 병합 커밋 [`8fca819`](https://github.com/hossea123456789-design/AltTabFlow/commit/8fca8193761bca80812b20c188350d7e4165f34f) ([PR #6](https://github.com/hossea123456789-design/AltTabFlow/pull/6)). 새 세션에서는 최신 `main` HEAD와 PR/Actions를 다시 확인하세요.
 - **1.1.8 변경:** 일반 Alt+Tab 종료 누락 복구, 16ms 활성 세션 복구 타이머, 오래된 키 기록 정리, 이전 고정 UI 재시작 상태 초기화. [PR #6 Windows CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42792830910)에서 SHA-256·.NET 컴파일·단일 EXE·기본 206개·UI 71개·메인/설정 스크린샷 성공.
 - **1.1.7 변경:** 9개 소스 파일 변경, 전체 인계 문서 추가, 줄바꿈 정책·SHA-256 검증 자동화. [Windows PR CI #42777258155](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155)에서 체크섬·컴파일·EXE 게시·기본 161개·UI 71개·실제 WinForms 메인/설정 화면 캡처 성공. 새 세션에서는 최신 `main`/PR/Actions를 다시 확인.
 - 주 이슈: [#1 실사용 검증 체크리스트](https://github.com/hossea123456789-design/AltTabFlow/issues/1).
@@ -40,6 +41,16 @@
 - **P4 및 소유 팝업:** 실제로 클릭한 전경 창과 소유 관계를 고려해 MRU 왕복. 실제 전경 활성화 성공을 확인한 뒤 전환기 종료.
 - **1.1.6 UI:** 좌측 메뉴/설정 카드/하단 저장, 7종 테마, 모니터·크기·보기·제외 목록; 미리보기·취소는 원본 설정 파일을 변경하지 않음.
 - **1.1.7 설정:** 숨길 앱 입력창 Enter는 줄바꿈; 수동 상단 등록 앱 이름 입력 Enter는 등록. 상단 등록 앱 행에는 체크+실제 아이콘+앱/프로세스 이름, 아이콘 없으면 글자 배지.
+
+## 1.1.9 게임 관리자 모드 / EXE 자체 업데이트
+
+- 문제: 기존 manifest는 `asInvoker`, CI ZIP에서 `AltTabFlow.exe`는 `artifacts/ci-publish/` 아래, 게임 호환 스크립트는 ZIP root. EXE를 관리자 권한으로 재실행해도 동일 사용자 mutex의 일반 권한 인스턴스가 열려 있으면 새 관리자 인스턴스가 바로 종료될 수 있음.
+- 수정: 트레이/설정의 게임 관리자 다시 시작 → UAC 승인 후 기존 프로세스 `--quit` IPC → per-user Mutex takeover → 관리자 `--background` 실행. UAC 취소는 기존 프로세스 보존.
+- 자동 업데이트: 트레이/설정 확인 → 첫 1회 Fine-grained PAT(Contents:read, Actions:read, 전용 저장소만), Windows Credential Manager 보관 → `main` 최신 성공 CI 버전 확인 → ZIP 자동 다운로드/검증 → 별도 updater EXE가 기존 프로세스 종료 후 백업/교체 → 재시작. `settings.json` 수정 금지.
+- GitHub Actions 실행 후보 아티팩트 이름은 **`AltTabFlow-win-x64-CANDIDATE`**로 안정화, EXE와 호환 실행 스크립트 동일 폴더 배치. 이전 1.1.8 사용자는 1.1.9를 **처음 한 번만 수동으로 설치**해야 함.
+- 현재 Github repo는 **비공개**이며 GitHub Releases는 생성되지 않은 상태였습니다. 따라서 최초 자동 업데이트는 정식 Release API가 아니라 Actions 최신 성공 후보를 조회하며, 실제 Windows 관리자 게임/UAC 검증 완료를 의미하지 않습니다.
+- 신규 `GitHubUpdater.cs`, `GameCompatibility.cs`. `--updater-self-test` 11개 추가. 기존 기본 206·UI 71 검사는 유지.
+- 독립 Windows PC에서 반드시 검증할 사항: UAC 수락/취소, 기존 일반 인스턴스 인계, 관리자 게임 내 실제 Alt+Tab, 저장된 토큰/권한, 자동 다운로드·교체·롤백·게임 스크립트 동봉.
 
 ## 1.1.8 종료 누락 수정 / 새로운 세션에서 반드시 확인할 내용
 
