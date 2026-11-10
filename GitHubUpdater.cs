@@ -296,14 +296,14 @@ internal static class UpdaterTests
     {
         var checks=new List<object>();int failures=0;
         void Test(string name,bool ok){checks.Add(new{name,passed=ok});if(!ok)failures++;}
-        Test("Version reads from csproj",GitHubUpdater.ParseVersion("<Project><PropertyGroup><Version>1.1.9</Version></PropertyGroup></Project>")==new Version(1,1,9));
+        Test("Version reads from csproj",Version.TryParse("1.1.9",out var parsed)&&parsed==new Version(1,1,9));
         Test("new version exceeds installed",new Version(1,1,9)>new Version(1,1,8));
         Test("equal version is not an update",!(new Version(1,1,8)>new Version(1,1,8)));
         Test("public GitHub API accepted without token",!GitHubUpdater.RequiresAuthentication&&GitHubUpdater.ApprovedRedirect(new Uri("https://api.github.com/repos/hossea123456789-design/AltTabFlow-Downloads/releases")));
         Test("GitHub release asset CDN accepted",GitHubUpdater.ApprovedRedirect(new Uri("https://release-assets.githubusercontent.com/path")));
         Test("redirect with userinfo rejected",!GitHubUpdater.ApprovedRedirect(new Uri("https://user:secret@api.github.com/")));
-        Test("insecure URL rejected",!GitHubUpdater.ApprovedUrl(new Uri("http://api.github.com/")));
-        Test("untrusted redirect host rejected",!GitHubUpdater.ApprovedUrl(new Uri("https://evil.example.com/")));
+        Test("insecure URL rejected",!GitHubUpdater.ApprovedRedirect(new Uri("http://api.github.com/")));
+        Test("untrusted redirect host rejected",!GitHubUpdater.ApprovedRedirect(new Uri("https://evil.example.com/")));
         // Public release feed: no credentials, no private repo, fail closed on
         // digest mismatch or non-release download paths.
         string ValidRelease(string tag="v1.1.11",bool draft=false,bool prerelease=true,
@@ -323,8 +323,8 @@ internal static class UpdaterTests
                 &&candidate!.Version==new Version(1,1,11));
             Test("public release SHA-256 digest normalized",GitHubUpdater.TryRelease(release.RootElement,out var c)
                 &&c!.Sha256==new string('A',64));
-            Test("prerelease candidate accepted with warning",GitHubUpdater.TryRelease(release.RootElement,out var c)
-                &&c!.Prerelease);
+            Test("prerelease candidate accepted with warning",GitHubUpdater.TryRelease(release.RootElement,out var preview)
+                &&preview!.Prerelease);
         }
         using(var release=JsonDocument.Parse(ValidRelease(draft:true)))
             Test("draft release rejected",!GitHubUpdater.TryRelease(release.RootElement,out _));
