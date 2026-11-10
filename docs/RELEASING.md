@@ -17,12 +17,11 @@ gh release create v1.1.10 '.\releases\AltTabFlow-latest-win-x64.zip' --title 'Al
 
 실기기 검증 전에는 태그와 완성 릴리스 배포를 하지 않습니다. 개인 설정, 창 목록 및 진단 로그는 저장소와 릴리스에 포함하지 않습니다.
 
-## 공개 배포 저장소 일회성 설정 (1.1.11 이후)
+## 단일 공개 저장소 릴리스 (v1.1.12 이후)
 
-1. 소스 저장소 `hossea123456789-design/AltTabFlow`는 **Private 유지**.
-2. GitHub 계정에서 `AltTabFlow-Downloads` 이름의 **Public** 새 저장소 생성(공개 ZIP만 게시; 원본 소스 복사/공개 금지).
-3. Fine-grained Personal Access Token을 **오직 공개 `AltTabFlow-Downloads` 저장소** 대상으로 `Contents: Read and write` 권한으로 만들고, 비공개 원본 저장소 Settings → Secrets and variables → Actions → New repository secret의 `ALTTABFLOW_PUBLIC_RELEASE_TOKEN`에 등록. 토큰은 앱 사용자에게 요구하지 않으며 채팅/Git 이슈에 붙이지 않음.
-4. 비공개 Windows CI `windows-build.yml` 성공 후 `publish-public-binaries.yml` 배포 작업 실행 결과 확인. 공개 릴리스 `v1.1.11` 첨부 파일이 **`AltTabFlow-win-x64.zip` + `SHA256SUMS.txt`만**인지 검증.
-5. 공개 GitHub API의 Release Asset `sha256:` digest, Windows ZIP의 exe 버전, 실제 로그인 없는 앱 업데이트 설치를 별도 Windows PC에서 확인. 파일 서명 및 실사용 게임/관리자 예약 시작 검증 전까지 **Preview**임을 표시.
-
-공개 저장소나 배포 Secret이 아직 준비되지 않으면 배포 Actions는 경고와 함께 **게시하지 않음**으로 기록하며, 이를 공개 업데이트 성공으로 보고하지 않습니다.
+1. 저장소 소유자가 기존 `hossea123456789-design/AltTabFlow`의 과거 커밋·Issues/Actions 로그를 검토하고 **Public**으로 전환합니다. 연결된 GitHub App에서는 Admin 권한이 없어 visibility를 변경할 수 없습니다.
+2. 기존 소스 저장소 하나만 사용합니다. `AltTabFlow-Downloads` 생성이나 PAT 발급, 별도 Secret 등록은 **필요하지 않습니다**.
+3. Private 상태에서는 `publish-public-binaries.yml`가 실제 릴리스를 게시하지 않도록 막습니다. Private → Public 전환 순간 GitHub `public` 이벤트로 릴리스 배포 작업이 자동 실행됩니다. 별도 Actions 수동 실행은 필요하지 않습니다(필요시 재시도용 workflow_dispatch 제공).
+4. 워크플로가 `main`의 정확한 HEAD 커밋과 같은 성공 Windows CI를 선택하고 `AltTabFlow-win-x64.zip`, `SHA256SUMS.txt`만 릴리스 자산으로 올리는지 확인합니다. GitHub의 자동 Source code 링크는 저장소가 이미 Public이므로 별개입니다.
+5. 앱에서는 GitHub 토큰 없이 동일 저장소 공개 Releases API의 최신 유효 버전, SHA-256 digest, ZIP 내 EXE 버전을 검사해 자동 교체·재시작합니다.
+6. CI 검사는 입력206/UI85/업데이터22/관리자 시작11=324건. 실제 메이플 독점 전체화면, UAC, 파일 교체 종단간 및 공개 릴리스 조회는 별도로 확인하고 정식 검증 완료로 과장하지 않습니다.

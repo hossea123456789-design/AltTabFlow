@@ -1,3 +1,10 @@
+## 1.1.12 · 단일 Public 저장소 방식 (2026-11-11)
+
+- 사용자가 기존 AltTabFlow 저장소 자체를 Public으로 전환해 다운로드 저장소·PAT를 없애기로 결정.
+- `GitHubUpdater.PublicRepo`를 원본 저장소로 바꾸고, 퍼블리셔를 `contents:write` **기본 GITHUB_TOKEN**으로 변경. CI 성공 SHA 확인·공개 전용 검사·ZIP+SHA256SUMS 공개 릴리스 방식.
+- Chat GitHub 연결에는 관리 권한(visibility PATCH)이 없으므로 사용자 GitHub 웹 UI에서 `Change repository visibility → Public` 한 번만 수행. 변경 전 코드는 테스트 가능하지만 업데이트 릴리스는 미게시.
+- 기존 Alt+Enter 메이플 화면·전경 개선(1.1.11)을 유지, 무인 Windows CI와 실제 게임 사용 검증은 분리.
+
 # AltTabFlow 개발·운영 이력 (2026-11-10)
 
 이 기록은 **대화 요약이 아니라 GitHub에 남기는 장기 추적 로그**입니다. 실제 검증과 첨부 문서에 기록된 검증을 혼동하지 않습니다. 소스의 진실 공급원은 항상 해당 시점의 Git commit이며, 요구사항의 진실 공급원은 버전별 원문 명세입니다.

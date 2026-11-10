@@ -32,3 +32,5 @@ Before editing code in any new session, read and respect these repository-owned 
 “Review this repository's `AGENTS.md`, `docs/PROJECT_HANDOFF.md`, `docs/DEVELOPMENT_HISTORY.md`, `docs/ARCHITECTURE_AND_INVARIANTS.md`, `docs/TEST_MATRIX.md`, latest code/PR/Actions and Issue #1. Report the verified current version and unresolved validations first, then continue the requested work.”
 
 The private GitHub repository is the durable project record, not any particular ChatGPT chat session or local temporary file.
+
+- v1.1.12: user selected ONE PUBLIC repository `hossea123456789-design/AltTabFlow` for source and release. The GitHub app here lacks admin visibility permission: do not claim repo is public until checked. Publisher uses only built-in GITHUB_TOKEN (contents:write/actions:read), never a PAT or another repo. Enforce same main HEAD successful Windows CI. Do not publish any release while repo is private.

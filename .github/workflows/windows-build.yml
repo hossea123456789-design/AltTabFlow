@@ -54,7 +54,7 @@ jobs:
       - name: Upload basic navigation test report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.11-navigation-self-test
+          name: AltTabFlow-v1.1.12-navigation-self-test
           path: artifacts/ci-tests/self-test.json
           if-no-files-found: error
           retention-days: 30
@@ -74,7 +74,7 @@ jobs:
       - name: Upload UI test report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.11-UI-self-test
+          name: AltTabFlow-v1.1.12-UI-self-test
           path: artifacts/ci-tests/ui-test.json
           if-no-files-found: error
           retention-days: 30
@@ -95,7 +95,7 @@ jobs:
       - name: Upload updater self-test report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.11-updater-self-test
+          name: AltTabFlow-v1.1.12-updater-self-test
           path: artifacts/ci-tests/updater-test.json
           if-no-files-found: error
           retention-days: 30
@@ -116,7 +116,7 @@ jobs:
       - name: Upload elevated startup report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.11-startup-self-test
+          name: AltTabFlow-v1.1.12-startup-self-test
           path: artifacts/ci-tests/startup-test.json
           if-no-files-found: error
           retention-days: 30
@@ -133,10 +133,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AltTabFlow-actual-Windows-preview
-          path: artifacts/ui-preview/AltTabFlow-1.1.11-actual.png
+          path: artifacts/ui-preview/AltTabFlow-1.1.12-actual.png
           if-no-files-found: error
           retention-days: 30
-      - name: Capture actual 1.1.11 settings UI
+      - name: Capture actual 1.1.12 settings UI
         id: settings-screenshot
         shell: pwsh
         continue-on-error: true
@@ -145,8 +145,8 @@ jobs:
         if: steps.settings-screenshot.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.11-settings-actual-Windows
-          path: artifacts/ui-preview/AltTabFlow-1.1.11-settings-actual.png
+          name: AltTabFlow-v1.1.12-settings-actual-Windows
+          path: artifacts/ui-preview/AltTabFlow-1.1.12-settings-actual.png
           if-no-files-found: error
           retention-days: 30
       - name: Capture actual persistent updater dialog
@@ -158,8 +158,8 @@ jobs:
         if: steps.updater-screenshot.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.11-updater-dialog-Windows
-          path: artifacts/ui-preview/AltTabFlow-1.1.11-update-dialog.png
+          name: AltTabFlow-v1.1.12-updater-dialog-Windows
+          path: artifacts/ui-preview/AltTabFlow-1.1.12-update-dialog.png
           if-no-files-found: error
           retention-days: 30
       - name: Stage a SINGLE folder executable with its game compatibility scripts
@@ -173,7 +173,7 @@ jobs:
           $exe = Get-Item 'artifacts\package\AltTabFlow\AltTabFlow.exe'
           $version = $exe.VersionInfo.ProductVersion
           Write-Host "Candidate product version: $version"
-          if ($version -notmatch '^1\.1\.11(?:[.+]|$)') { throw "Expected version 1.1.11, got $version" }
+          if ($version -notmatch '^1\.1\.12(?:[.+]|$)') { throw "Expected version 1.1.12, got $version" }
           foreach ($name in @('AltTabFlow.exe','Run-GameCompat.ps1','Game-compat-mode.cmd')) {
             if (!(Test-Path (Join-Path 'artifacts\package\AltTabFlow' $name))) { throw "Missing $name" }
           }

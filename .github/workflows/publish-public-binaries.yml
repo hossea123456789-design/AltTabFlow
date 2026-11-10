@@ -1,80 +1,115 @@
-name: Publish public binary preview release
+name: Publish AltTabFlow Release (same public repository)
 on:
   workflow_run:
     workflows: ["Windows compile (not full UI validation)"]
     types: [completed]
     branches: [main]
   workflow_dispatch:
+  public:
+
 permissions:
-  contents: read
+  contents: write
   actions: read
+
 jobs:
-  publish-binaries:
+  publish-release:
     if: >
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'public' ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - name: Check repository is Public
+        id: visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          V="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.visibility')"
+          if [ "$V" != "public" ]; then
+            echo "public=false" >> "$GITHUB_OUTPUT"
+            echo "Not published: repository is still Private. Change GitHub Settings > General > Danger Zone > Change repository visibility > Public." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "public=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout source metadata
+        if: steps.visibility.outputs.public == 'true'
+        uses: actions/checkout@v4
         with:
           ref: main
           persist-credentials: false
-      - name: Locate matching successful private Windows CI
-        id: ci
+
+      - name: Require current main SHA successful Windows CI
+        if: steps.visibility.outputs.public == 'true'
+        id: selected
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           VERSION="$(grep -oP '(?<=<Version>)[^<]+' AltTabFlow.csproj | head -1)"
-          HEAD="$(git rev-parse HEAD)"
-          RUN="$(gh api "repos/$REPO/actions/workflows/windows-build.yml/runs?branch=main&status=success&per_page=30" \
-            --jq ".workflow_runs[] | select(.head_sha == \"$HEAD\") | .id" | head -1)"
-          test -n "$VERSION" && test -n "$RUN"
+          MAIN_SHA="$(git rev-parse HEAD)"
+          RUN="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/windows-build.yml/runs?branch=main&status=success&per_page=30" \
+            --jq ".workflow_runs[] | select(.head_sha == \"$MAIN_SHA\" and .conclusion == \"success\" and .event == \"push\") | .id" | head -1)"
+          test -n "$VERSION" && test -n "$RUN" ||
+            { echo "::error::No successful Windows CI for this main commit"; exit 1; }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "run_id=$RUN" >> "$GITHUB_OUTPUT"
-      - name: Download CI-validated executable only
+          echo "sha=$MAIN_SHA" >> "$GITHUB_OUTPUT"
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+
+      - name: Never overwrite an existing version
+        if: steps.visibility.outputs.public == 'true'
+        id: existing
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RUN: ${{ steps.ci.outputs.run_id }}
+          V: ${{ steps.selected.outputs.version }}
         run: |
+          if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Existing v$V release preserved." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download verified Windows CI executable
+        if: steps.visibility.outputs.public == 'true' && steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.selected.outputs.run }}
+        run: |
+          set -euo pipefail
           mkdir -p candidate
-          gh run download "$RUN" --repo "$REPO" --name AltTabFlow-win-x64-CANDIDATE --dir candidate
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name AltTabFlow-win-x64-CANDIDATE --dir candidate
           for f in AltTabFlow.exe Game-compat-mode.cmd Run-GameCompat.ps1 사용법.txt; do
-            test -s "candidate/$f"
+            test -s "candidate/$f" || { echo "::error::Missing $f"; exit 1; }
           done
-      - name: Pack binary allowlist + SHA256
+
+      - name: Pack executable ZIP and SHA-256
+        if: steps.visibility.outputs.public == 'true' && steps.existing.outputs.exists == 'false'
         run: |
           set -euo pipefail
           (cd candidate && zip -j -9 ../AltTabFlow-win-x64.zip AltTabFlow.exe Game-compat-mode.cmd Run-GameCompat.ps1 사용법.txt)
           sha256sum AltTabFlow-win-x64.zip > SHA256SUMS.txt
           test "$(unzip -Z1 AltTabFlow-win-x64.zip | wc -l | tr -d ' ')" = "4"
           if unzip -Z1 AltTabFlow-win-x64.zip | grep -v -x -E 'AltTabFlow.exe|Game-compat-mode.cmd|Run-GameCompat.ps1|사용법.txt'; then
-            echo "::error::Unexpected file in distribution"
+            echo "::error::Unexpected file in ZIP"
             exit 1
           fi
-      - name: Publish to public binary-only repository
+          cat SHA256SUMS.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish same-repo release (built-in GITHUB_TOKEN)
+        if: steps.visibility.outputs.public == 'true' && steps.existing.outputs.exists == 'false'
         env:
-          GH_TOKEN: ${{ secrets.ALTTABFLOW_PUBLIC_RELEASE_TOKEN }}
-          TARGET: hossea123456789-design/AltTabFlow-Downloads
-          VERSION: ${{ steps.ci.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.selected.outputs.version }}
+          MAIN_SHA: ${{ steps.selected.outputs.sha }}
         run: |
           set -euo pipefail
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::warning::PUBLIC RELEASE NOT PUBLISHED — create public repo and set ALTTABFLOW_PUBLIC_RELEASE_TOKEN in private repo Actions secrets"
-            echo "NOT PUBLISHED: configure public binary repo and deploy secret once." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          test "$(gh api "repos/$TARGET" --jq '.visibility')" = "public"
-          TAG="v$VERSION"
-          if gh release view "$TAG" --repo "$TARGET" >/dev/null 2>&1; then
-            echo "Existing release $TAG preserved; will never overwrite assets." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          gh release create "$TAG" AltTabFlow-win-x64.zip SHA256SUMS.txt \
-            --repo "$TARGET" --title "AltTabFlow $VERSION · Windows x64 Preview" \
-            --notes "CI-validated EXE preview; only binary ZIP and SHA256SUMS.txt are attached. Private source remains private. Game/UAC/end-to-end update testing remains pending." \
+          gh release create "v$VERSION" ./AltTabFlow-win-x64.zip ./SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" --target "$MAIN_SHA" \
+            --title "AltTabFlow $VERSION · Windows x64 Preview" \
+            --notes "CI-verified Windows executable candidate. Keyboard, UI, updater and elevated-startup self-tests passed. Real MapleStory Alt+Enter exclusive fullscreen, UAC and end-to-end self-update remain unverified." \
             --prerelease --latest=false
-          echo "Published binary-only release $TARGET $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/v$VERSION" >> "$GITHUB_STEP_SUMMARY"
