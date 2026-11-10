@@ -5,10 +5,10 @@
   "sourceFiles": 29,
   "sourcePatch": "docs/specs/AltTabFlow_1.1.8_갱신내용.md",
   "patchHunks": "Applied with exact context and no conflicts",
-  "githubSourceSHA256": "PENDING",
-  "githubBuild": "PENDING",
-  "githubBasic206": "PENDING",
-  "githubUi71": "PENDING",
+  "githubSourceSHA256": "PASS (CI 42812687675)",
+  "githubBuild": "PASS (PR #7 CI 42812687675)",
+  "githubBasic206": "PASS (206/206, CI 42812687675)",
+  "githubUi71": "PASS (71/71, CI 42812687675)",
   "githubNativeWindowTests": "NOT_RUN_IN_THIS_SESSION",
   "sourceReportedTests": {
     "basic": 206,
@@ -27,9 +27,12 @@
   "mainMergeCommit": "8fca8193761bca80812b20c188350d7e4165f34f",
   "githubBuiltExeSha256": "8c376e3f0db38e2cdfd2afaac9b9882d8ceecff1d3f2a0d747834407d9c8b658",
   "baseVersion": "1.1.8",
-  "githubUpdater11": "PENDING",
+  "githubUpdater11": "PASS (11/11, CI 42812687675)",
   "elevatedGamePhysicalTest": "NOT_RUN",
   "fullUpdaterEndToEnd": "NOT_RUN",
   "privateRepoUpdateMethod": "Authenticated GitHub Actions main success artifact, Windows Credential Manager fine-grained PAT",
-  "candidateArtifactName": "AltTabFlow-win-x64-CANDIDATE"
+  "candidateArtifactName": "AltTabFlow-win-x64-CANDIDATE",
+  "githubCandidatePackage": "PASS (exe + Game-compat-mode.cmd + Run-GameCompat.ps1 in root, CI 42812687675)",
+  "mainMergeSha": "51175f30dd9c0e0aa8792593e3956703f7f24e8d",
+  "candidateExeSha256": "c6dbe595d9416293044be6890e029ea9327f37d3f35c693b10fa0411d12405b7"
 }
