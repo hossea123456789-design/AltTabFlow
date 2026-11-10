@@ -99,7 +99,7 @@ jobs:
           path: artifacts/ci-tests/updater-test.json
           if-no-files-found: error
           retention-days: 30
-      - name: Validate elevated interactive startup plan (10 cases)
+      - name: Validate elevated interactive startup plan (11 cases)
         shell: pwsh
         run: |
           $exe = Join-Path (Get-Location) 'artifacts\ci-publish\AltTabFlow.exe'
@@ -108,7 +108,7 @@ jobs:
           if (!(Test-Path $file)) { throw 'Missing elevated startup test report' }
           $report = Get-Content $file -Raw | ConvertFrom-Json
           $passed = @($report.tests | Where-Object {$_.passed}).Count
-          if ($test.ExitCode -ne 0 -or $report.failures -ne 0 -or $passed -ne 10) {
+          if ($test.ExitCode -ne 0 -or $report.failures -ne 0 -or $passed -ne 11) {
             throw "Elevated startup tests failed: passed=$passed failures=$($report.failures)"
           }
           New-Item -ItemType Directory -Force 'artifacts\ci-tests' | Out-Null

@@ -15,7 +15,7 @@ internal static class ElevatedStartup
     internal static bool UseElevatedTask(bool start,bool elevated)=>start&&elevated;
     internal static string LaunchArguments=>"--background";
     // A highest-privilege task must NOT point at a user-writable Downloads,
-    // Desktop or AppData executable. Install the signed/verified candidate
+    // Desktop or AppData executable. Install the user-approved candidate
     // into the admin-protected Program Files folder first.
     internal static string ProtectedInstallPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
