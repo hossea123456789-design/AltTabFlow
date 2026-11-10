@@ -314,6 +314,78 @@ internal static class SelfTests
         Check("Tab 다음 늦은 Ctrl-down은 이동 없이 Pin 명령",promoted.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Pin}));
         promotedRouter.Route(0xA2,false,true,true,false,true);promotedRouter.Route(9,true,true,false,false,true);promotedRouter.Route(9,false,true,false,false,true);promotedRouter.Route(0xA4,false,false,false,false,true);
         Check("Ctrl 먼저 해제 후 Tab 반복도 고정 유지하며 확정하지 않음",promoted.Last()==SwitchCommand.PinnedNext&&!promoted.Contains(SwitchCommand.Commit));
+        // A hook may miss an unrelated key-up across an IME/desktop/hook handoff.
+        // Historical presses must not become permanent blockers for a new gesture.
+        foreach(uint staleKey in new uint[]{0x41,0x5B,0xE5,0x7B}){
+            var emitted=new List<SwitchCommand>();var physical=new HashSet<uint>();
+            var reconciled=new ShortcutRouter(emitted.Add,physical.Contains);
+            physical.Add(staleKey);reconciled.Route(staleKey,true,false,false,false,true);
+            physical.Clear(); // release occurred but its callback was not delivered
+            reconciled.Route(9,true,true,false,false,true);reconciled.Route(9,false,true,false,false,true);
+            reconciled.Route(0xA4,false,false,false,false,true);
+            Check($"과거 키 0x{staleKey:X2} 해제 누락이 일반 AltTab 종료를 막지 않음",emitted.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Commit}));
+        }
+        {
+            var emitted=new List<SwitchCommand>();var physical=new HashSet<uint>();
+            var reconciled=new ShortcutRouter(emitted.Add,physical.Contains);
+            reconciled.Route(9,true,true,false,false,true);reconciled.Route(9,false,true,false,false,true);
+            physical.Add(0xE5);reconciled.Route(0xE5,true,true,false,false,true);physical.Clear();
+            reconciled.Route(0xA4,false,false,false,false,true);
+            Check("전환 도중 놓친 IME 키 해제도 마지막 Alt-up에서 정리",emitted.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Commit}));
+        }
+        {
+            var emitted=new List<SwitchCommand>();var physical=new HashSet<uint>{0x41};
+            var reconciled=new ShortcutRouter(emitted.Add,physical.Contains);
+            reconciled.Route(0x41,true,false,false,false,true);reconciled.Route(9,true,true,false,false,true);reconciled.Route(9,false,true,false,false,true);
+            reconciled.Route(0xA4,false,false,false,false,true);
+            Check("실제로 계속 누른 다른 키는 성급하게 해제로 처리하지 않음",!emitted.Contains(SwitchCommand.Commit));
+            physical.Clear();reconciled.Route(0x41,false,false,false,false,true);
+            Check("실제 다른 키를 마지막에 놓으면 한 번 확정",emitted.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Commit}));
+        }
+        foreach(uint swallowed in new uint[]{9,0x25,0x26,0x27,0x28,0xC0}){
+            var emitted=new List<SwitchCommand>();var reconciled=new ShortcutRouter(emitted.Add,_=>false);
+            reconciled.Route(9,true,true,false,false,true);reconciled.Route(9,false,true,false,false,true);
+            reconciled.Route(swallowed,true,true,false,false,true);reconciled.Route(0xA4,false,false,false,false,true);
+            Check($"가로챈 키 0x{swallowed:X2}의 비동기 0을 해제로 오인하지 않음",!emitted.Contains(SwitchCommand.Commit));
+            reconciled.Route(swallowed,false,false,false,false,true);
+            Check($"가로챈 키 0x{swallowed:X2}는 실제 key-up으로 확정",emitted.Count(c=>c==SwitchCommand.Commit)==1);
+        }
+        {
+            var emitted=new List<SwitchCommand>();var recovered=new ShortcutRouter(emitted.Add,_=>false);
+            recovered.Route(9,true,true,false,false,true);recovered.Route(9,false,true,false,false,true);
+            recovered.ReconcileReleased(true,false,false);
+            Check("해제 복구는 실제 Alt를 누르고 있으면 기다림",!emitted.Contains(SwitchCommand.Commit));
+            recovered.ReconcileReleased(false,true,false);recovered.ReconcileReleased(false,false,true);
+            Check("해제 복구는 실제 Ctrl 또는 Shift를 누르고 있어도 기다림",!emitted.Contains(SwitchCommand.Commit));
+            recovered.ReconcileReleased(false,false,false);
+            Check("마지막 Alt-up 통지가 누락돼도 실제 전체 해제 후 확정",emitted.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Commit}));
+            recovered.ReconcileReleased(false,false,false);recovered.Route(0xA4,false,false,false,false,true);
+            Check("복구 뒤 늦은 key-up이나 타이머가 중복 확정하지 않음",emitted.Count(c=>c==SwitchCommand.Commit)==1);
+        }
+        {
+            var emitted=new List<SwitchCommand>();var recovered=new ShortcutRouter(emitted.Add,_=>false);
+            recovered.Route(9,true,true,true,false,true);recovered.Route(9,false,true,true,false,true);
+            recovered.ReconcileReleased(false,false,false);
+            Check("고정 모드 해제 통지가 누락돼도 복구는 화면 확정 명령을 보내지 않음",emitted.SequenceEqual(new[]{SwitchCommand.PinnedNext})&&!recovered.IsActive);
+            recovered.Route(9,true,true,false,false,true);recovered.Route(9,false,true,false,false,true);recovered.ReconcileReleased(false,false,false);
+            Check("고정 해제 복구 뒤 새 일반 AltTab은 정상 확정",emitted.SequenceEqual(new[]{SwitchCommand.PinnedNext,SwitchCommand.Next,SwitchCommand.Commit}));
+        }
+        foreach(uint swallowed in new uint[]{9,0x25,0x26,0x27,0x28,0xC0}){
+            var emitted=new List<SwitchCommand>();var recovered=new ShortcutRouter(emitted.Add,_=>false);
+            recovered.Route(9,true,true,false,false,true);recovered.Route(9,false,true,false,false,true);
+            recovered.Route(swallowed,true,true,false,false,true);recovered.ReconcileReleased(false,false,false);
+            Check($"해제 복구도 소비한 키 0x{swallowed:X2}의 key-up을 기다림",!emitted.Contains(SwitchCommand.Commit));
+            recovered.Route(swallowed,false,false,false,false,true);
+            Check($"해제 복구 중 키 0x{swallowed:X2}를 놓으면 한 번 확정",emitted.Count(c=>c==SwitchCommand.Commit)==1);
+        }
+        {
+            var emitted=new List<SwitchCommand>();var physical=new HashSet<uint>();var recovered=new ShortcutRouter(emitted.Add,physical.Contains);
+            recovered.Route(9,true,true,false,false,true);recovered.Route(9,false,true,false,false,true);
+            physical.Add(0x41);recovered.Route(0x41,true,true,false,false,true);recovered.ReconcileReleased(false,false,false);
+            Check("해제 복구에서도 실제 일반 키를 누르면 대기",!emitted.Contains(SwitchCommand.Commit));
+            physical.Clear();recovered.ReconcileReleased(false,false,false);
+            Check("일반 키와 Alt 해제 모두 통지 누락이어도 실제 상태로 복구",emitted.Count(c=>c==SwitchCommand.Commit)==1);
+        }
         foreach(var viewport in new[]{new Size(4048,2048),new Size(1872,976),new Size(1318,704)}){
             foreach(int count in new[]{17,22}){
                 var layout=LayoutPlanner.Plan(count,viewport.Width,viewport.Height,false);
@@ -384,6 +456,11 @@ internal static class SelfTests
                     form.TestKey(Keys.Escape);Check(mode+" 고정 화면 Esc는 전환 없이 닫힘",!form.Visible&&activated==0);
                     form.PrepareNavigationTest(navigationRows);form.Show();pinnedFormRouter.Route(9,true,true,false,false,true);pinnedFormRouter.Route(9,false,true,false,false,true);pinnedFormRouter.Route(0xA4,false,false,false,false,true);
                     Check(mode+" 고정 화면 취소 뒤 일반 AltTab은 키 해제로 전환",!form.Visible&&activated==200);
+                    activated=0;form.PrepareNavigationTest(navigationRows,true);form.Show();
+                    pinnedFormRouter.Route(9,true,true,false,false,true);pinnedFormRouter.Route(9,false,true,false,false,true);
+                    Check(mode+" 고정 화면이 남아 있어도 새 일반 AltTab은 빠른 전환 모드",form.Visible&&!form.IsPersistent);
+                    pinnedFormRouter.Route(0xA4,false,false,false,false,true);
+                    Check(mode+" 남아 있던 고정 화면도 일반 AltTab 해제에 선택 전환 후 닫힘",!form.Visible&&activated==200);
                 } finally {form.Shutdown();}
             }
         }

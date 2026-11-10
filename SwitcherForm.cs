@@ -133,7 +133,9 @@ internal sealed class SwitcherForm : Form
     public void TrackForeground(nint hwnd)=>TrackForeground(hwnd,unchecked((uint)Environment.TickCount));
     public void OpenSwitcher(bool pinned, int direction = 1, bool sameApp = false) {
         if(committing)return;
-        if (Visible) { persistent |= pinned; activation.Request(Handle); MoveSelection(direction); return; }
+        // Each Alt+Tab gesture selects its own lifetime. A previously pinned UI
+        // must not prevent a new plain gesture from committing on key release.
+        if (Visible) { persistent = pinned; releaseTimestamp=0;if(!pinned)ActiveControl=null;activation.Request(Handle); MoveSelection(direction); return; }
         opening = Stopwatch.StartNew();
         PrepareSwitcher(pinned,direction,sameApp);
         ApplyBounds();EnsurePage(); ApplyTheme();

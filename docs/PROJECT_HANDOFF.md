@@ -6,10 +6,10 @@
 
 - 저장소: [hossea123456789-design/AltTabFlow](https://github.com/hossea123456789-design/AltTabFlow) (**Private**)
 - 기본 브랜치: `main`; 변경은 `update/vX.Y.Z-...` 브랜치와 Pull Request로 진행.
-- **현재 `main`: 1.1.7**, 소스 병합 커밋 [`da05572`](https://github.com/hossea123456789-design/AltTabFlow/commit/da05572fe9bbd23fcd8bccfdd677805cdfb87582) ([PR #5](https://github.com/hossea123456789-design/AltTabFlow/pull/5)).
+- **업데이트 기준:** 1.1.7 `main` 커밋 `a5ae270`. **1.1.8은 업데이트 브랜치 `update/v1.1.8-missed-keyup-commit`에서 검증 중**입니다. 다음 세션에서는 최신 `main`과 PR을 조회해 병합 여부 및 확정 커밋부터 다시 확인하세요.
 - **1.1.7 변경:** 9개 소스 파일 변경, 전체 인계 문서 추가, 줄바꿈 정책·SHA-256 검증 자동화. [Windows PR CI #42777258155](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155)에서 체크섬·컴파일·EXE 게시·기본 161개·UI 71개·실제 WinForms 메인/설정 화면 캡처 성공. 새 세션에서는 최신 `main`/PR/Actions를 다시 확인.
 - 주 이슈: [#1 실사용 검증 체크리스트](https://github.com/hossea123456789-design/AltTabFlow/issues/1).
-- 상세 기록: [개발 이력](DEVELOPMENT_HISTORY.md), [변경 불가 동작 계약](ARCHITECTURE_AND_INVARIANTS.md), [검증 매트릭스](TEST_MATRIX.md), [1.1.7 원문 변경 명세](specs/AltTabFlow_1.1.7_갱신내용.md).
+- 상세 기록: [개발 이력](DEVELOPMENT_HISTORY.md), [변경 불가 동작 계약](ARCHITECTURE_AND_INVARIANTS.md), [검증 매트릭스](TEST_MATRIX.md), [1.1.8 원문 변경 명세](specs/AltTabFlow_1.1.8_갱신내용.md).
 - 이 문서의 기준 시점: **2026-11-10**. 이후 결과는 PR, CI 로그, 이슈에 반드시 추가하세요.
 
 ## 애플리케이션 목적
@@ -40,7 +40,15 @@
 - **1.1.6 UI:** 좌측 메뉴/설정 카드/하단 저장, 7종 테마, 모니터·크기·보기·제외 목록; 미리보기·취소는 원본 설정 파일을 변경하지 않음.
 - **1.1.7 설정:** 숨길 앱 입력창 Enter는 줄바꿈; 수동 상단 등록 앱 이름 입력 Enter는 등록. 상단 등록 앱 행에는 체크+실제 아이콘+앱/프로세스 이름, 아이콘 없으면 글자 배지.
 
-## 최신 1.1.7 검증 범위와 주의
+## 1.1.8 종료 누락 수정 / 새로운 세션에서 반드시 확인할 내용
+
+- 관측: 일반 Alt+Tab 화면 `visible=true`, `persistent=false`, `lastTabCtrl=false` 상태에서 `Next`는 반복되고 `Commit`만 누락. 정확한 원인 가상 키는 확인되지 않았습니다.
+- 해결: 훅이 놓친 이전 key-up 기록(knownDown)을 실제 Windows 눌림 상태와 대조해 정리하고, 입력 세션이 살아 있을 때에만 훅 스레드 16ms WM_TIMER로 해제 여부를 보조 확인합니다. **가로챈 Tab·방향키 등은 async 0으로 놓였다고 단정하지 않습니다.**
+- 고정 모드 Ctrl+Alt+Tab은 키를 놓아도 유지하되, **그 뒤 새 일반 Alt+Tab은 일반 모드로 전환**해 마지막 키 해제 시 닫습니다.
+- 원본 1.1.8 명세: **기본 206 + UI 71 + Peek 10 + 메뉴 7 + Focus 18(중복10) = 고유 302개** 통과 기록. 명세 작성자가 실제 사용자 입력에서 일반 2~3회와 고정 조합 정상 동작을 확인했다고 기재했습니다. 이 별도 Windows 환경의 사실을 GitHub CI/현재 세션 실기기 통과와 섞지 마세요.
+- 최신 CI에서 **기본 206/206 + UI 71/71**가 성공했는지 확인한 뒤 PR을 병합하세요. 다른 고유 25개 및 실제 관리자 게임·P4 테스트는 별도로 관리합니다.
+
+## 과거 1.1.7 검증 범위와 주의
 
 1.1.7 인계 문서에는 **고유 257개** 통과 기록(기본 161 + Peek 10 + 메뉴 7 + Focus 18 중 Peek 10 중복 + UI 71)이 있습니다. **이는 인계 문서 작성 환경의 기록**으로, GitHub CI 및 실제 사용자 PC 재검증과 구별해야 합니다.
 

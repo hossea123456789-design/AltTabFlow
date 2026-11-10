@@ -2,9 +2,9 @@
 
 **세션 간 후속 작업 시작점: [PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md)** · [전체 개발 이력](docs/DEVELOPMENT_HISTORY.md) · [동작 불변 조건](docs/ARCHITECTURE_AND_INVARIANTS.md) · [검증 매트릭스](docs/TEST_MATRIX.md)
 
-Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.7**입니다.
+Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.8**입니다.
 
-> **검증 분리:** 첨부 1.1.7 명세에는 고유 **257개** 회귀 검사 통과 기록이 있습니다(기본 161, UI 71, Peek 10, 메뉴 7, 전경 18 중 Peek 10 중복). 이는 인계 문서 작성 환경의 결과입니다. GitHub CI에서 실제 확인한 수와 사용자 Windows 실기기 검증을 별도로 기록합니다.
+> **검증 분리:** 첨부된 1.1.8 인계 명세는 기본 206 + UI 71 + Peek 10 + 메뉴 7 + Focus 18(이미 포함된 Peek 10 중복) = **고유 302개 검사 통과**를 보고합니다. GitHub CI에서는 기본 206개+UI 71개를 별도 검증하며, 실제 전경·메뉴·게임 회귀 검사는 구분합니다.
 
 ## 주요 기능
 
@@ -15,6 +15,7 @@ Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전
 - 앱 상단 등록, 숨기기, 검색, 로그인 자동 시작 설정 저장
 - 메이플스토리처럼 관리자 권한으로 실행된 앱을 위한 `Game-compat-mode.cmd`
 - 1.1.2: 우클릭 메뉴 수명 관리 오류 수정, `--menu-self-test` 추가
+- 1.1.8: 일반 Alt+Tab 종료 누락 복구 — 오래된 키 눌림 기록 정리, 세션 중 누락된 key-up 확인, 일반 재시작 시 이전 고정 모드 초기화
 - 1.1.7: 숨길 앱 Enter 줄바꿈, Ctrl+Alt+Tab 고정 화면 유지·반복/역방향/늦은 Ctrl 승격, 상단 정렬 앱 아이콘 및 비동기 로딩
 - 1.1.6: 설정 화면을 왼쪽 메뉴/오른쪽 카드/하단 고정 저장으로 전면 개편. 테마형 버튼·체크·선택 필드·우클릭 메뉴·제목 표시줄 적용, 마우스 up 확정 및 이탈 취소
 - 1.1.5: Alt+Tab 이후 방향키로 이동해도 고정하지 않으며 누른 키를 모두 놓았을 때 현재 하이라이트 창으로 확정. Esc는 취소하고 명시적 상세 모드는 유지
@@ -50,9 +51,9 @@ et8.0-windows\AltTabFlow.exe'
 1. 버그 수정 및 기능 제안은 **Issues**로 기록합니다.
 2. 변경 코드는 별도 브랜치에서 수정하고 **Pull Request**로 `main`에 병합합니다.
 3. GitHub Actions는 **컴파일/게시 가능 여부만 확인**합니다. 실제 창, 메뉴, 게임 모드는 로컬 Windows에서 별도 검증해야 합니다.
-4. 257개 고유 테스트의 검증 결과를 확보한 후에만 `v1.1.x` 태그 및 **Releases**에 완성 ZIP을 등록합니다.
+4. 302개 고유 테스트의 검증 결과를 확보한 후에만 `v1.1.x` 태그 및 **Releases**에 완성 ZIP을 등록합니다.
 5. 상태 파일이나 창 제목이 포함된 로그는 저장소에 커밋하지 않습니다. 오류 보고 시에도 민감한 창 제목과 경로를 삭제합니다.
 
-자세한 변경 이력은 [CHANGELOG.md](CHANGELOG.md), 인수 점검은 [docs/ROADMAP.md](docs/ROADMAP.md), 1.1.7 변경 근거는 [docs/specs/AltTabFlow_1.1.7_갱신내용.md](docs/specs/AltTabFlow_1.1.7_갱신내용.md)를 확인합니다.
+자세한 변경 이력은 [CHANGELOG.md](CHANGELOG.md), 인수 점검은 [docs/ROADMAP.md](docs/ROADMAP.md), 1.1.8 변경 근거는 [docs/specs/AltTabFlow_1.1.8_갱신내용.md](docs/specs/AltTabFlow_1.1.8_갱신내용.md)를 확인합니다.
 
 **배포 주의:** CI에서 생성한 후보 EXE는 실사용 창 제어 검사 전까지 검증 완료 릴리스로 배포하지 않습니다. 이 프로그램은 Windows 시스템 파일을 수정하지 않으며 정상 종료하면 원래 Alt+Tab이 돌아옵니다.

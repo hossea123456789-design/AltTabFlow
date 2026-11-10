@@ -12,6 +12,7 @@
 | 1.1.4 | P4 소유 팝업·실제 클릭 창 기준 MRU, 전경 활성화 확인, QuickGesture/FX 최적화, Switching.cs 추가 | 112 (기본87+Peek10+메뉴7+Focus18−중복10) | [PR #2](https://github.com/hossea123456789-design/AltTabFlow/pull/2), [Windows 성공 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42764686888), [main merge](https://github.com/hossea123456789-design/AltTabFlow/commit/b2e5aa57d031d7201d40788fa6bcf7db290509a1) |
 | 1.1.5 | 일반 Alt+Tab 방향키 탐색 시 자동 고정 제거, 마지막 key-up 커밋·Esc 취소 | 142 (117+10+7+18−10) | [PR #3](https://github.com/hossea123456789-design/AltTabFlow/pull/3), [Windows CI 기본117](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42766936582), [main merge](https://github.com/hossea123456789-design/AltTabFlow/commit/c26cc1237c1920d374487a91f154c4c8284f2694) |
 | 1.1.6 | 설정 좌측 메뉴/우측 카드/하단 고정 저장, 7종 테마, owner-draw UI, mouse-up 커밋, UI 62개 | 204 (117+10+7+18+62−10) | [PR #4](https://github.com/hossea123456789-design/AltTabFlow/pull/4), [Windows CI 기본117+UI62](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42768914976), [main merge](https://github.com/hossea123456789-design/AltTabFlow/commit/93fb3164a1945016926526730b791ffb1f6f4140) |
+| **1.1.8** | 일반 Alt+Tab 화면 잔류: 오래된 해제 누락 키 기록 정리, 세션 중 16ms WM_TIMER로 마지막 키 해제 보조 복구, 기존 고정 화면 위 일반 전환 재시작 시 상태 초기화 | **302 (206+71+10+7+18−10)** | 1.1.8 명세에 재현 검사 및 사용자의 일반/고정 조합 실사용 확인 기록이 있음. **GitHub CI 결과 및 실제 Windows 재시험은 PR/Actions에서 별도로 확인** |
 | **1.1.7** | 숨길 앱 Enter 줄바꿈, Ctrl+Alt+Tab 고정·반복·늦은 Ctrl 승격, 상단 등록 앱 아이콘·폴백·비동기 로딩 | **257 (161+10+7+18+71−10)** | [PR #5](https://github.com/hossea123456789-design/AltTabFlow/pull/5), [CI 기본161+UI71 및 체크섬·컴파일 성공](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155), [main 병합](https://github.com/hossea123456789-design/AltTabFlow/commit/da05572fe9bbd23fcd8bccfdd677805cdfb87582). 사용자 Windows PC 전경·게임 입력 검증은 별도 |
 
 ## GitHub 전환과 관리 결정
@@ -20,7 +21,7 @@
 - 초기 원본과 1.1.2 변경을 Git으로 등록하고, GitHub Actions Windows 빌드·테스트 후보 EXE 업로드, 메인/설정 화면 캡처 자동화 및 Issues/PR 템플릿을 추가했습니다.
 - 이후 요청은 GitHub 별도 브랜치 → PR → CI → `main` 병합 흐름으로 관리. CI 컴파일과 실사용 회귀 테스트는 구별했습니다.
 - [Issue #1](https://github.com/hossea123456789-design/AltTabFlow/issues/1)은 **버전마다 갱신하는 실사용 검증의 단일 체크리스트**입니다. 검증 미완료 상태에서 정식 GitHub Release를 만들지 않습니다.
-- 버전별 원문 명세를 `docs/` 아래에 보관. 1.1.1 완전 원문은 `docs/1.1.1-완전명세-아카이브.md`, 후속 패치는 `docs/1.1.2-변경명세.md`, `docs/1.1.4-변경명세.md`, `docs/1.1.5-변경명세.md`, `docs/1.1.6-UI개선-변경명세.md`, `docs/specs/AltTabFlow_1.1.7_갱신내용.md`입니다.
+- 버전별 원문 명세를 `docs/` 아래에 보관. 1.1.1 완전 원문은 `docs/1.1.1-완전명세-아카이브.md`, 후속 패치는 `docs/1.1.2-변경명세.md`, `docs/1.1.4-변경명세.md`, `docs/1.1.5-변경명세.md`, `docs/1.1.6-UI개선-변경명세.md`, `docs/specs/AltTabFlow_1.1.7_갱신내용.md`, `docs/specs/AltTabFlow_1.1.8_갱신내용.md`입니다.
 
 ## 추적해야 할 중요한 회귀/설계 결정
 
@@ -32,6 +33,16 @@
 6. **앱 아이콘**: 비동기 아이콘 추출 중 UI를 막지 않으며, 종료된 폼에 BeginInvoke/Invalidate 하지 않음. 체크 선택의 객체 참조 동일성 유지.
 7. **Windows UI**: 1.1.6 이후 도입된 owner-draw/GDI 테마와 사용자 키보드 접근성 유지. 96 DPI 검증과 혼합 DPI 실측은 구분.
 8. **EXE 이력**: 명세에 언급된 배포 ZIP/EXE 해시는 타 환경의 빌드 지문. GitHub CI로 재빌드한 파일과 당연히 일치하지 않을 수 있음.
+
+## 1.1.8 문제 진단 및 재발 방지
+
+- 빠른 전환 종료 누락 시 Ctrl 오인식만 가정하지 말 것. 최근 라우터 명령에 `Next` 반복 + `Commit` 부재, `persistent=false`를 근거로 **남은 눌린 키의 상태**부터 확인.
+- 일반 키 `knownDown`의 **과거 기록**은 물리 상태와 대조해 정리하되, **훅에서 소비한 키**의 비동기 상태가 0이라는 이유만으로 임의 해제 금지.
+- `KeyboardHook`은 16ms 확인 타이머를 **입력 세션에서만** 설치/해제. 실제 키가 모두 놓인 경우 일반 세션 Commit은 정확히 한 번, 고정 세션 Commit은 발행하지 않음.
+- 이전 고정 UI가 보이더라도 새 일반 Alt+Tab의 인자로 `persistent=false`로 전환.
+- 명세는 **자동 입력 테스트 도중 마지막 Alt-up이 전달되지 않던 현상**을 관찰했으나 사용자 물리 키 문제와 같은 원인이라 단정하지 않음. 관리자 메이플스토리·자동화 도구·권한 조건을 결과에 남김.
+- 명세의 로컬 배포 ZIP SHA-256: `7BC446AC0BB43F26EE3E2354DBDC023F34AAC8027C2BBF07C327FFC43CA5650C`; EXE SHA-256: `6ABD2FA306B0106F3D1ED6296A0E0276CD5BE039380CD761D9C0C856F0021F0C`. **실제 바이너리는 이 대화에 업로드되지 않았고 GitHub CI에서 빌드한 후보와 지문이 다를 수 있음.**
+- 다음 세션에서 `docs/specs/AltTabFlow_1.1.8_갱신내용.md`의 실제 6파일 패치와 테스트를 참조.
 
 ## 남은 실제 검증
 

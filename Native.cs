@@ -41,6 +41,8 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint from,uint to,bool attach);
     [DllImport("user32.dll")] public static extern bool IsHungAppWindow(nint hwnd);
     [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int key);
+    [DllImport("user32.dll")] public static extern nuint SetTimer(nint hwnd,nuint id,uint milliseconds,nint callback);
+    [DllImport("user32.dll")] public static extern bool KillTimer(nint hwnd,nuint id);
     [DllImport("user32.dll",SetLastError=true)] public static extern bool SetWindowPos(nint hwnd,nint after,int x,int y,int w,int h,uint flags);
     [DllImport("user32.dll")] public static extern nint WindowFromPoint(Point point);
     [StructLayout(LayoutKind.Sequential,Pack=1)] public struct BlendFunction {public byte BlendOp,BlendFlags,SourceConstantAlpha,AlphaFormat;}
