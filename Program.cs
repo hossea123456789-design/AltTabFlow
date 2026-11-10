@@ -29,6 +29,8 @@ internal static class Program
         AppDomain.CurrentDomain.UnhandledException+=(_,e)=>AppLog.Write("fatal-error",new{error=e.ExceptionObject.ToString()});
         Directory.CreateDirectory(Preferences.DataDirectory);
         AppLog.Suppressed=args.Any(x=>x.EndsWith("self-test",StringComparison.Ordinal)||x.EndsWith("fixture",StringComparison.Ordinal));
+        if(args.Contains("--updater-self-test")) { UpdaterTests.Run(); return; }
+        if(args.Length>0&&args[0]=="--apply-update") { UpdateInstaller.Run(args); return; }
         if(args.Contains("--self-test")) { SelfTests.Run(); return; }
         if(args.Contains("--peek-self-test")) { PeekTests.Run(); return; }
         if(args.Contains("--focus-self-test")) { PeekTests.Run(true); return; }
@@ -39,7 +41,17 @@ internal static class Program
         if(args.Length==2&&args[0]=="--focus-fixture") { PeekTests.RunFocusFixture(args[1]); return; }
         if(args.Contains("--dump")) { File.WriteAllText(Path.Combine(Preferences.DataDirectory,"windows.json"),JsonSerializer.Serialize(WindowCatalog.Read().Select(x=>new{hwnd=x.Handle.ToInt64(),x.Title,x.AppName,x.ProcessName,x.Path,x.Minimized}),new JsonSerializerOptions{WriteIndented=true})); return; }
         using var mutex=new Mutex(true,@"Local\AltTabFlow.CurrentUser."+Environment.UserName,out bool first);
-        if(!first) { SendCommand(args.Contains("--quit")?"quit":args.Contains("--status")?"status":args.Contains("--pause")?"pause":args.Contains("--hide")?"hide":"show"); return; }
+        if(!first) {
+            if(args.Contains("--takeover")&&GameCompatibility.IsElevated) {
+                if(!GameCompatibility.TakeOver(mutex,()=>SendCommand("quit"))) {
+                    MessageBox.Show("기존 AltTabFlow가 종료되지 않아 관리자 전환을 중단했습니다. 작업 관리자에서 기존 프로세스를 확인해 주세요.","AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+                    return;
+                }
+            } else {
+                SendCommand(args.Contains("--quit")?"quit":args.Contains("--status")?"status":args.Contains("--pause")?"pause":args.Contains("--hide")?"hide":"show");
+                return;
+            }
+        }
         if(args.Contains("--quit")||args.Contains("--status")||args.Contains("--pause")||args.Contains("--hide")) return;
         bool running=false;
         try { using var context=new SwitcherContext(args); running=true; Application.Run(context); }
@@ -48,7 +60,7 @@ internal static class Program
             MessageBox.Show((running?"AltTabFlow 실행 중 오류가 발생해 종료되었습니다.":"AltTabFlow를 시작하지 못했습니다.")+"\n"+ex.Message,"AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Error);
         }
     }
-    private static void SendCommand(string command) {
+    internal static void SendCommand(string command) {
         try { using var pipe=new NamedPipeClientStream(".","AltTabFlow."+Environment.UserName,PipeDirection.Out); pipe.Connect(1800); using var writer=new StreamWriter(pipe); writer.WriteLine(command); writer.Flush(); } catch { }
     }
 }
@@ -80,6 +92,8 @@ internal sealed class SwitcherContext : ApplicationContext
         var menu=new ContextMenuStrip();
         menu.Items.Add("AltTabFlow 열기    Ctrl+Alt+Space",null,(_,_)=>form.OpenSwitcher(true,0));
         menu.Items.Add("설정",null,(_,_)=> { if(!form.Visible)form.OpenSwitcher(true,0); form.ShowSettings(); });
+        menu.Items.Add("업데이트 확인",null,async (_,_)=>await GitHubUpdater.CheckAndInstallAsync(form,Exit));
+        menu.Items.Add(GameCompatibility.IsElevated?"게임 호환 관리자 모드: 켜짐":"게임 호환: 관리자 권한으로 다시 시작",null,(_,_)=>GameCompatibility.RequestElevatedRestart(form));
         pauseMenu=new ToolStripMenuItem("Alt+Tab 대체 일시 중지",null,(_,_)=>TogglePause()); menu.Items.Add(pauseMenu);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("완전히 종료 (기본 Alt+Tab 복원)",null,(_,_)=>Exit());
@@ -93,7 +107,7 @@ internal sealed class SwitcherContext : ApplicationContext
             startupTimer.Stop();
             if(!args.Contains("--background"))form.OpenSwitcher(true,0);
         }; startupTimer.Start();
-        AppLog.Write("started",new{version=typeof(Program).Assembly.GetName().Version?.ToString(),preview=args.Contains("--preview"),pid=Environment.ProcessId});
+        AppLog.Write("started",new{version=typeof(Program).Assembly.GetName().Version?.ToString(),preview=args.Contains("--preview"),pid=Environment.ProcessId,elevated=GameCompatibility.IsElevated,hook=keyboard?.Statistics});
     }
     private static Icon CreateIcon() {
         using var stream=typeof(Program).Assembly.GetManifestResourceStream("AltTabFlow.Assets.AltTabFlow.ico");
@@ -159,7 +173,7 @@ internal sealed class SwitcherContext : ApplicationContext
                     case "quit": Exit(); break;
                     case "hide": form.Dismiss(false); break;
                     case "pause": TogglePause(); break;
-                    case "status": File.WriteAllText(Path.Combine(Preferences.DataDirectory,"status.json"),JsonSerializer.Serialize(new{ui=form.DiagnosticState(),pid=Environment.ProcessId,paused,altTabEnabled=keyboard?.Enabled??false,hook=keyboard?.Statistics,shortcuts=shortcutHistory.ToArray()},new JsonSerializerOptions{WriteIndented=true})); break;
+                    case "status": File.WriteAllText(Path.Combine(Preferences.DataDirectory,"status.json"),JsonSerializer.Serialize(new{ui=form.DiagnosticState(),pid=Environment.ProcessId,elevated=GameCompatibility.IsElevated,paused,altTabEnabled=keyboard?.Enabled??false,hook=keyboard?.Statistics,shortcuts=shortcutHistory.ToArray()},new JsonSerializerOptions{WriteIndented=true})); break;
                 }
             } catch(OperationCanceledException){break;} catch(Exception ex){AppLog.Write("ipc-error",new{ex.Message}); if(!closing)await Task.Delay(200);}
         }
