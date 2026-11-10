@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>AltTabFlow</AssemblyName>
-    <Version>1.1.13</Version>
+    <Version>1.1.14</Version>
     <Company>Local Tools</Company>
     <Product>AltTabFlow</Product>
     <Description>앱별로 정리하는 창 전환기</Description>
