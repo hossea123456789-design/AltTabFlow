@@ -5,9 +5,9 @@
   "patchBase": "1.1.6",
   "sourcePatch": "docs/specs/AltTabFlow_1.1.7_갱신내용.md",
   "staticPatchCheck": "PASS (9 exact contextual diffs)",
-  "githubWindowsBuild": "PENDING",
-  "githubBasic161": "PENDING",
-  "githubUi71": "PENDING",
+  "githubWindowsBuild": "PASS (PR CI 42777258155)",
+  "githubBasic161": "PASS (161/161, CI 42777258155)",
+  "githubUi71": "PASS (71/71, CI 42777258155)",
   "manualWindowsTests": "NOT_RUN_IN_THIS_SESSION",
   "handoffReportedPassed": {
     "basic": 161,
@@ -18,5 +18,8 @@
     "unique": 257,
     "overlap": 10
   },
-  "handoffNote": "Earlier normal-integrity foreground test failed when elevated MapleStory was foreground; admin full-suite pass reported; must re-verify locally."
+  "handoffNote": "Earlier normal-integrity foreground test failed when elevated MapleStory was foreground; admin full-suite pass reported; must re-verify locally.",
+  "githubSourceSha256": "PASS (manifest check, CI 42777258155)",
+  "githubActualWindowsUiScreenshot": "PASS (main and settings, CI 42777258155)",
+  "mainMergeCommit": "da05572fe9bbd23fcd8bccfdd677805cdfb87582"
 }

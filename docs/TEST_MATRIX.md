@@ -4,8 +4,8 @@
 
 | 검사 | CLI | 1.1.7 기대 수 | CI 자동화 | 실제 Windows 사용자 세션 |
 |---|---|---:|---|---|
-| 기본 키 입력·그룹·고정 세션 | `--self-test` | **161** | ✅ 실행 예정/결과는 Actions 확인 | 별도 재검증 |
-| UI·줄바꿈·아이콘·접근성 | `--ui-self-test` | **71** | ✅ 실행 예정/결과는 Actions 확인 | 별도 재검증 |
+| 기본 키 입력·그룹·고정 세션 | `--self-test` | **161** | ✅ [PR #5 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155) 성공 | 별도 재검증 |
+| UI·줄바꿈·아이콘·접근성 | `--ui-self-test` | **71** | ✅ [PR #5 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155) 성공 | 별도 재검증 |
 | 실제 창 미리 표시/취소 | `--peek-self-test` | **10** | 무인 CI에서 보장 불가 | 필요 |
 | 우클릭 메뉴 생명주기 | `--menu-self-test` | **7** | 무인 CI에서 보장 불가 | 필요 |
 | 전경 권한·지연된 대상 | `--focus-self-test` | **18** | 무인 CI에서 보장 불가 | 필요; Peek 10개와 중복 |
@@ -43,7 +43,7 @@ dotnet build .\AltTabFlow.csproj -c Release
 
 ## 자동 CI의 한계
 
-- CI Windows Server 실행 환경에서 컴파일·기본 161개·UI 71개·스냅샷/설정 실제 캡처까지 확인 가능.
+- **검증 완료:** [PR #5 Windows CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155)에서 SHA-256 manifest, .NET 컴파일, self-contained EXE, 기본 161/161, UI 71/71, 실제 메인·설정 화면 캡처 성공.
 - CI 스크린샷은 실제 WinForms 화면이지만 메이플스토리·P4 프로그램이 설치되어 있다는 뜻이 아님.
 - 257개 전체 실기기 확인 전에는 CI 후보 ZIP을 정식 사용자 검증 릴리스로 승격하지 않음.
 - 빌드 아티팩트는 만료될 수 있음. 장기 추적의 진실 공급원은 **Git commit + PR + 테스트 체크리스트**. 검증 완료된 릴리스만 GitHub Release에 등록.

@@ -6,8 +6,8 @@
 
 - 저장소: [hossea123456789-design/AltTabFlow](https://github.com/hossea123456789-design/AltTabFlow) (**Private**)
 - 기본 브랜치: `main`; 변경은 `update/vX.Y.Z-...` 브랜치와 Pull Request로 진행.
-- 직전 검증된 `main` 소스: **1.1.6**, 최종 커밋 `93fb3164a1945016926526730b791ffb1f6f4140`.
-- 이번 작업: **1.1.7** 소스 변경 9개를 PR용 `update/v1.1.7-input-icons-and-handoff` 브랜치에 추가. 최종 병합 여부는 최신 `main`/PR/Actions를 반드시 다시 확인.
+- **현재 `main`: 1.1.7**, 소스 병합 커밋 [`da05572`](https://github.com/hossea123456789-design/AltTabFlow/commit/da05572fe9bbd23fcd8bccfdd677805cdfb87582) ([PR #5](https://github.com/hossea123456789-design/AltTabFlow/pull/5)).
+- **1.1.7 변경:** 9개 소스 파일 변경, 전체 인계 문서 추가, 줄바꿈 정책·SHA-256 검증 자동화. [Windows PR CI #42777258155](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42777258155)에서 체크섬·컴파일·EXE 게시·기본 161개·UI 71개·실제 WinForms 메인/설정 화면 캡처 성공. 새 세션에서는 최신 `main`/PR/Actions를 다시 확인.
 - 주 이슈: [#1 실사용 검증 체크리스트](https://github.com/hossea123456789-design/AltTabFlow/issues/1).
 - 상세 기록: [개발 이력](DEVELOPMENT_HISTORY.md), [변경 불가 동작 계약](ARCHITECTURE_AND_INVARIANTS.md), [검증 매트릭스](TEST_MATRIX.md), [1.1.7 원문 변경 명세](specs/AltTabFlow_1.1.7_갱신내용.md).
 - 이 문서의 기준 시점: **2026-11-10**. 이후 결과는 PR, CI 로그, 이슈에 반드시 추가하세요.
@@ -44,7 +44,7 @@
 
 1.1.7 인계 문서에는 **고유 257개** 통과 기록(기본 161 + Peek 10 + 메뉴 7 + Focus 18 중 Peek 10 중복 + UI 71)이 있습니다. **이는 인계 문서 작성 환경의 기록**으로, GitHub CI 및 실제 사용자 PC 재검증과 구별해야 합니다.
 
-이전 1.1.6 GitHub CI는 기본 117개 + UI 62개 = 179개 성공 ([PR #4 검증 실행](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42768914976), [main 실행](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42769488092)). 1.1.7을 병합할 때는 CI에서 161/71을 새로 확인한 뒤 병합하세요. 실제 Peek/전경/메뉴/게임·혼합 DPI 검증은 CI 화면 캡처만으로 완료 처리하지 마세요.
+이전 1.1.6 GitHub CI는 기본 117개 + UI 62개 = 179개 성공 ([PR #4 검증 실행](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42768914976), [main 실행](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42769488092)). 1.1.7은 [PR #5](https://github.com/hossea123456789-design/AltTabFlow/pull/5)를 **CI 161/161 + UI 71/71 통과 후 병합**했습니다. 후속 버전 역시 새로운 CI와 Windows 실기기 검사로 별도 검증하세요. 실제 Peek/전경/메뉴/게임·혼합 DPI 검증은 CI 화면 캡처만으로 완료 처리하지 마세요.
 
 인계 문서에는 **일반 권한으로 전체 전경 테스트 실행 시 관리자 메이플스토리가 전경을 점유해 실패가 반복되고, 관리자 권한 전체 재검사에서 통과**한 사례가 있습니다. 실패를 은폐하거나 임의로 테스트 합격으로 바꾸지 마세요. 조건·권한·foreground HWND를 기록하고 재현하세요.
 
