@@ -2,10 +2,10 @@
 
 ## 검사 수
 
-| 검사 | CLI | 1.1.10 기대 수 | CI 자동화 | 실제 Windows 사용자 세션 |
+| 검사 | CLI | 1.1.11 기대 수 | CI 자동화 | 실제 Windows 사용자 세션 |
 |---|---|---:|---|---|
-| 기본 키 입력·그룹·고정 세션 | `--self-test` | **206** | ✅ [PR #8 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 206/206 성공 | 별도 재검증 |
-| UI·줄바꿈·아이콘·접근성·휠/업데이트 창·최대화 게임 오버레이 | `--ui-self-test` | **85** | ✅ [PR #8 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 80/80 성공 | 별도 재검증 |
+| 기본 키 입력·그룹·고정 세션 | `--self-test` | **206** | ✅ [PR #9 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) 206/206 성공 | 별도 재검증 |
+| UI·줄바꿈·아이콘·접근성·휠/업데이트 창·최대화 게임 오버레이 | `--ui-self-test` | **85** | ✅ [PR #9 CI](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) 85/85 성공 | 별도 재검증 |
 | 실제 창 미리 표시/취소 | `--peek-self-test` | **10** | 무인 CI에서 보장 불가 | 필요 |
 | 우클릭 메뉴 생명주기 | `--menu-self-test` | **7** | 무인 CI에서 보장 불가 | 필요 |
 | 전경 권한·지연된 대상 | `--focus-self-test` | **18** | 무인 CI에서 보장 불가 | 필요; Peek 10개와 중복 |
@@ -93,3 +93,9 @@ dotnet build .\AltTabFlow.csproj -c Release
 - [ ] 익명 Windows 프로그램 업데이트: 공개 GitHub API → ZIP SHA-256 → EXE 버전 → 안전 교체/백업 → 재시작
 - [ ] 공개 릴리스 누락/404, 토큰 입력 없는 업데이트 창, SHA 오류, 네트워크 취소/쓰기 거부 시 기존 버전 보존
 - [ ] 실제 테스트/로그는 공개 repo에 업로드하지 않음; 25개 고유 Peek/Menu/Focus 물리 회귀 별도
+
+## 1.1.11 GitHub PR #9 CI 증거 및 미완료 사항
+
+[Windows CI #42842347985](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) **성공**: SHA-256 무결성, Windows .NET 8 컴파일, self-contained EXE 게시, 기본206/206, UI85/85, 공개 업데이트22/22, 관리자 로그인 시작11/11 = 총 **324/324개**. Windows 실제 전환기/설정/업데이트 창 캡처와 EXE+게임 스크립트 동일 폴더 실행 후보 ZIP 업로드 성공. [PR #9 main 병합](https://github.com/hossea123456789-design/AltTabFlow/pull/9).
+
+**아직 미완료:** 공개 다운로드 전용 GitHub 저장소 `AltTabFlow-Downloads` 생성 및 게시 권한 연결, 첫 공개 `v1.1.11` 프리릴리스 발행, 사용자 PC의 Alt+Enter 메이플 게임 포커스 실측, 공개 릴리스 익명 다운로드/실제 EXE 교체·재실행 검증. 공개 배포 기능이 원클릭으로 실제 작동한다고 주장하지 않음.
