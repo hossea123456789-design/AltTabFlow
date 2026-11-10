@@ -69,6 +69,7 @@ internal static class WindowCatalog
     private static readonly ConcurrentDictionary<string, Bitmap> Icons = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Bitmap FallbackIcon = SystemIcons.Application.ToBitmap();
     public static Bitmap CachedIcon(WindowInfo w) => Icons.GetValueOrDefault(w.GroupKey, FallbackIcon);
+    public static Bitmap? CachedAppIcon(WindowInfo w)=>Icons.GetValueOrDefault(w.GroupKey);
     private static readonly Dictionary<string, string> Names = new(StringComparer.OrdinalIgnoreCase) {
         ["EXCEL"]="Excel", ["chrome"]="Chrome", ["msedge"]="Edge", ["explorer"]="파일 탐색기",
         ["slack"]="Slack", ["olk"]="Outlook", ["OUTLOOK"]="Outlook", ["ChatGPT"]="Codex / ChatGPT",

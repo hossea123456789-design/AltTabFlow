@@ -216,6 +216,7 @@ internal sealed class SwitcherForm : Form
     }
     private void HideTargetVisuals(){visualTimer.Stop();aura.Hide();dimmer.Hide();peek.Restore();}
     public void NavigationReleased(long timestamp=0) { releaseTimestamp=persistent?0:timestamp; if (Visible && !persistent && !configuring && !committing) Choose(); }
+    public void PinSelection(){if(Visible&&!configuring&&!committing){persistent=true;releaseTimestamp=0;Invalidate();}}
     public void TogglePersistent() { if (Visible) Dismiss(true); else OpenSwitcher(true, 0); }
     public void Dismiss(bool restore) {
         bool wasCommitting=committing;
@@ -285,7 +286,7 @@ internal sealed class SwitcherForm : Form
         if (key == Keys.Back && search.TextLength==0 && !ctrl) { if(group!=null)GoBack(); return true; }
         if (key == Keys.Home && search.TextLength==0) { selected=0;EnsurePage();UpdateAura();Invalidate();return true; }
         if (key == Keys.End && search.TextLength==0) { selected=Math.Max(0,entries.Count-1);EnsurePage();UpdateAura();Invalidate();return true; }
-        if (key == Keys.Tab) { MoveSelection(shift ? -1 : 1); return true; }
+        if (key == Keys.Tab) { if(ctrl&&(keyData&Keys.Alt)!=0)PinSelection();MoveSelection(shift ? -1 : 1); return true; }
         if(key is Keys.Up or Keys.Down or Keys.Left or Keys.Right) {
             if((key is Keys.Left or Keys.Right)&&search.Focused&&search.TextLength>0){Invalidate();return base.ProcessCmdKey(ref msg,keyData);}
             NavigateArrow(key);return true;

@@ -10,6 +10,19 @@ internal static class UiTests
         string output=Path.Combine(Preferences.DataDirectory,"ui-previews");Directory.CreateDirectory(output);
         var windows=new List<WindowInfo>{new(101,"검토 중인 문서","chrome","Chrome","chrome.exe",0,false),new(102,"개발 작업","Code","Visual Studio Code","Code.exe",1,false),new(103,"일정 및 메시지","slack","Slack","slack.exe",2,false)};
         int dpi=96;
+        // Drive native TextBox message preprocessing, including the form's real
+        // AcceptButton. No SendInput, user settings or startup registration.
+        var editPrefs=new Preferences{StartWithWindows=false,Excluded=new(){"original_app"}};
+        using(var editForm=new SettingsForm(editPrefs,windows){PreviewRendering=true,PreviewOnly=true,TopMost=false,ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
+            editForm.Show();editForm.TestPage(3);var editor=Walk(editForm).OfType<TextBox>().Single(t=>t.Multiline);
+            editor.Text="chrome.exe";editor.SelectionStart=editor.TextLength;editor.Focus();
+            var enter=Message.Create(editor.Handle,0x100,(nint)13,0);bool consumed=editor.PreProcessMessage(ref enter);
+            if(!consumed&&!editor.IsDisposed)Native.SendMessageTimeout(editor.Handle,0x102,(nint)13,0,2,200,out _);
+            Check("hidden-app Enter inserts native newline",!editor.IsDisposed&&editor.Text=="chrome.exe\r\n");
+            Check("hidden-app Enter keeps dialog open without saving",editForm.Visible&&editForm.DialogResult==DialogResult.None&&editPrefs.Excluded.SequenceEqual(new[]{"original_app"}));
+            if(!editor.IsDisposed){editor.AppendText("EXCEL.exe");Walk(editForm).OfType<FlowButton>().Single(b=>b.Primary).PerformClick();}
+            Check("explicit save applies multiple hidden app lines",editPrefs.Excluded.SequenceEqual(new[]{"chrome","EXCEL"}));
+        }
         foreach(var p in ThemePalette.All){
             var prefs=new Preferences{ColorPreset=p.Id,LightTheme=p.Light,StartWithWindows=false,GroupApps=false,ShowPreview=true,UiScale=115,Pinned=new(){"chrome","missing_app"},Excluded=new(){"hidden_app"}};
             string original=JsonSerializer.Serialize(prefs);
@@ -35,6 +48,23 @@ internal static class UiTests
         }
         using(var selector=new FlowSelect()){
             selector.Items.AddRange(new object[]{"목록","카드","아이콘"});selector.SelectedIndex=0;selector.TestKey(Keys.Right);Check("view selector arrow selects next value",Equals(selector.SelectedItem,"카드"));selector.TestKey(Keys.Left);Check("view selector arrow selects previous value",Equals(selector.SelectedItem,"목록"));selector.TestKey(Keys.Left);Check("selector boundary stays valid",selector.SelectedIndex==0);
+        }
+        var iconPrefs=new Preferences{StartWithWindows=false,Pinned=new(){"chrome"}};
+        using(var form=new SettingsForm(iconPrefs,windows){PreviewRendering=true,PreviewOnly=true,TopMost=false,ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)})using(var icon=new Bitmap(28,28)){
+            using(var g=Graphics.FromImage(icon))g.Clear(Color.Coral);
+            form.Show();form.TestPage(1);var list=Walk(form).OfType<FlowAppList>().Single();var item=list.Items.Cast<IAppListItem>().Single(x=>x.ProcessName=="chrome");item.AppIcon=icon;
+            Check("loading icon preserves checked app identity",list.CheckedItems.Contains(item));
+            using(var bitmap=new Bitmap(list.Width,list.Height)){list.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));int D(float v)=>(int)Math.Round(v*list.DeviceDpi/96f);Check("app selection row draws actual supplied icon",bitmap.GetPixel(D(56),D(24)).ToArgb()==Color.Coral.ToArgb());}
+            form.TestApplyValues();Check("saving after icon load preserves pinned app",iconPrefs.Pinned.SequenceEqual(new[]{"chrome"}));
+            item.AppIcon=null;using(var bitmap=new Bitmap(40,40)){using(var g=Graphics.FromImage(bitmap)){g.Clear(Color.Magenta);AppIconDrawing.Paint(g,new Rectangle(2,2,28,28),null,"Chrome",form.Font,ThemePalette.All[0]);}Check("missing app icon draws identifying fallback badge",bitmap.GetPixel(5,5).ToArgb()!=Color.Magenta.ToArgb());}form.Close();
+        }
+        var ownIconWindow=new WindowInfo(0,"Icon fixture","icon_fixture","Icon fixture",Environment.ProcessPath!,0,false);
+        using(var form=new SettingsForm(new Preferences{StartWithWindows=false},new[]{ownIconWindow}){PreviewRendering=true,PreviewOnly=true,TopMost=false,ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
+            form.Show();var job=form.TestLoadIcons();var deadline=Environment.TickCount64+3000;while(!job.IsCompleted&&Environment.TickCount64<deadline){Application.DoEvents();Thread.Sleep(1);}
+            var list=Walk(form).OfType<FlowAppList>().Single();Check("background icon extraction fills settings item",job.IsCompletedSuccessfully&&((IAppListItem)list.Items[0]).AppIcon!=null);form.Close();
+        }
+        using(var form=new SettingsForm(new Preferences{StartWithWindows=false},new[]{ownIconWindow with{ProcessName="icon_cancel",Path=Environment.ProcessPath!+".missing"}}){PreviewRendering=true,PreviewOnly=true,TopMost=false,ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
+            form.Show();var job=form.TestLoadIcons();form.Close();var deadline=Environment.TickCount64+3000;while(!job.IsCompleted&&Environment.TickCount64<deadline){Application.DoEvents();Thread.Sleep(1);}Check("closing settings safely cancels pending icon load",form.IsDisposed&&job.IsCompletedSuccessfully);
         }
         using(var form=new Form{StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000),ShowInTaskbar=false})using(var selector=new FlowSelect{Palette=ThemePalette.All[3],Width=272,Height=40}){
             form.Controls.Add(selector);form.CreateControl();selector.CreateControl();selector.Items.AddRange(new object[]{"목록","카드","아이콘"});selector.SelectedIndex=0;

@@ -127,6 +127,7 @@ internal sealed class SwitcherContext : ApplicationContext
             case SwitchCommand.Previous: form.OpenSwitcher(false,-1); break;
             case SwitchCommand.PinnedNext: form.OpenSwitcher(true,1); break;
             case SwitchCommand.PinnedPrevious: form.OpenSwitcher(true,-1); break;
+            case SwitchCommand.Pin: form.PinSelection(); break;
             case SwitchCommand.SameApp: form.OpenSwitcher(false,1,true); break;
             case SwitchCommand.SameAppPrevious: form.OpenSwitcher(false,-1,true); break;
             case SwitchCommand.Persistent: form.TogglePersistent(); break;
@@ -255,7 +256,7 @@ internal static class SelfTests
         commands.Clear();Route(0xA2,ctrl:true);Route(9,ctrl:false);Route(9,false);Route(0xA4,false);
         Check("Ctrl-up 누락 뒤 실제 Ctrl 해제 상태면 정상 빠른 전환",commands.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Commit}));
         commands.Clear();for(int i=0;i<3;i++){Route(9,ctrl:true);Route(9,false,ctrl:true);}Route(0xA4,false);
-        Check("Ctrl+Alt+Tab 반복도 닫기 토글 없이 계속 이동",commands.SequenceEqual(new[]{SwitchCommand.PinnedNext,SwitchCommand.PinnedNext,SwitchCommand.PinnedNext,SwitchCommand.Commit}));
+        Check("Ctrl+Alt+Tab 반복은 계속 이동하며 키 해제에 Commit 없음",commands.SequenceEqual(new[]{SwitchCommand.PinnedNext,SwitchCommand.PinnedNext,SwitchCommand.PinnedNext}));
         commands.Clear();Route(9,shift:true);Route(9,false);Route(0xA4,false);
         Check("Shift 역방향 후 Alt 해제 확정",commands.SequenceEqual(new[]{SwitchCommand.Previous,SwitchCommand.Commit}));
         commands.Clear();Route(9);Route(9,false);Route(0x27);Route(0x27,false);Route(0xA4,false);
@@ -285,8 +286,8 @@ internal static class SelfTests
         Check("양쪽 Shift 중 하나만 놓아도 계속 기다림",!releaseCommands.Contains(SwitchCommand.Commit));Key(0xA1,false,shift:true);
         Check("현재 Shift-up 이벤트로 마지막 해제 판단",releaseCommands.Last()==SwitchCommand.Commit);
         BeginReleaseCase();Key(0xA2,true,true,ctrl:true);Key(0xA4,false,ctrl:true);Key(0xA2,false,ctrl:true,otherCtrl:true);
-        Check("양쪽 Ctrl 중 하나만 놓아도 계속 기다림",!releaseCommands.Contains(SwitchCommand.Commit));Key(0xA3,false,ctrl:true);
-        Check("현재 Ctrl-up 이벤트로 마지막 해제 판단",releaseCommands.Last()==SwitchCommand.Commit);
+        Check("AltTab 중 Ctrl을 누르면 고정 모드로 승격",releaseCommands.Last()==SwitchCommand.Pin);Key(0xA3,false,ctrl:true);
+        Check("고정 모드는 마지막 Ctrl 해제에도 Commit 없음",!releaseCommands.Contains(SwitchCommand.Commit));
         BeginReleaseCase();Key(0x27,true,true);Key(0x1B,true,true);Key(0x1B,false,true);Key(0xA4,false);Key(0x27,false);
         Check("Esc 취소 후 남은 키를 놓아도 전환하지 않음",releaseCommands.Last()==SwitchCommand.Cancel&&!releaseCommands.Contains(SwitchCommand.Commit));
         BeginReleaseCase();Key(0x0D,true,true);Key(0xA4,false);
@@ -295,6 +296,24 @@ internal static class SelfTests
         releaseCommands.Clear();releaseRouter=new ShortcutRouter(releaseCommands.Add);Key(0x27,true);Key(0xA4,true);Key(9,true,true);Key(9,false,true);Key(0xA4,false);
         Check("AltTab 전에 누른 화살표도 마지막 해제까지 기다림",!releaseCommands.Contains(SwitchCommand.Commit));Key(0x27,false);
         Check("시작 전에 누른 화살표 해제도 확정",releaseCommands.Last()==SwitchCommand.Commit);
+        Check("Alt 문맥 비트가 없어도 Tab에서 실제 Alt 눌림을 인식",KeyboardHook.AltSnapshot(9,0,true));
+        Check("Alt 자체 key-up은 이전 비동기 눌림으로 되살리지 않음",!KeyboardHook.AltSnapshot(0xA4,0,true));
+        Check("Alt 문맥·실제 눌림 모두 없으면 일반 Tab",!KeyboardHook.AltSnapshot(9,0,false));
+        foreach(var order in new[]{new uint[]{9,0xA4,0xA2},new uint[]{9,0xA2,0xA4},new uint[]{0xA4,9,0xA2},new uint[]{0xA4,0xA2,9},new uint[]{0xA2,9,0xA4},new uint[]{0xA2,0xA4,9}}){
+            var emitted=new List<SwitchCommand>();var pinnedRouter=new ShortcutRouter(emitted.Add);
+            pinnedRouter.Route(0xA2,true,false,false,false,true);pinnedRouter.Route(0xA4,true,false,true,false,true);
+            bool consumed=pinnedRouter.Route(9,true,KeyboardHook.AltSnapshot(9,0,true),true,false,true);
+            bool altHeld=true,ctrlHeld=true;
+            foreach(uint key in order){if(key==0xA4)altHeld=false;if(key==0xA2)ctrlHeld=false;pinnedRouter.Route(key,false,altHeld,ctrlHeld,false,true);}
+            Check("CtrlAltTab 해제 순서 "+string.Join("/",order)+"는 고정 열기만 전달",consumed&&emitted.SequenceEqual(new[]{SwitchCommand.PinnedNext}));
+            emitted.Clear();pinnedRouter.Route(9,true,true,false,false,true);pinnedRouter.Route(9,false,true,false,false,true);pinnedRouter.Route(0xA4,false,false,false,false,true);
+            Check("고정 제스처 이후 일반 AltTab 세션 초기화 "+string.Join("/",order),emitted.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Commit}));
+        }
+        var promoted=new List<SwitchCommand>();var promotedRouter=new ShortcutRouter(promoted.Add);
+        promotedRouter.Route(9,true,true,false,false,true);promotedRouter.Route(9,false,true,false,false,true);promotedRouter.Route(0xA2,true,true,false,false,true);
+        Check("Tab 다음 늦은 Ctrl-down은 이동 없이 Pin 명령",promoted.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Pin}));
+        promotedRouter.Route(0xA2,false,true,true,false,true);promotedRouter.Route(9,true,true,false,false,true);promotedRouter.Route(9,false,true,false,false,true);promotedRouter.Route(0xA4,false,false,false,false,true);
+        Check("Ctrl 먼저 해제 후 Tab 반복도 고정 유지하며 확정하지 않음",promoted.Last()==SwitchCommand.PinnedNext&&!promoted.Contains(SwitchCommand.Commit));
         foreach(var viewport in new[]{new Size(4048,2048),new Size(1872,976),new Size(1318,704)}){
             foreach(int count in new[]{17,22}){
                 var layout=LayoutPlanner.Plan(count,viewport.Width,viewport.Height,false);
@@ -339,6 +358,32 @@ internal static class SelfTests
                     Check(mode+" 펼친 Chrome 목록에서는 하이라이트한 개별 창으로 전환",activated==102&&!form.Visible);
                     activated=0;form.PrepareNavigationTest(navigationRows,true);form.Show();form.DetailedNavigate(Keys.Down);form.NavigationReleased();
                     Check(mode+" 명시적 고정 모드에서는 키 해제 후에도 화면 유지",form.Visible&&form.IsPersistent&&activated==0);form.Dismiss(false);
+                    // Route the full Ctrl+Alt+Tab gesture through the real open,
+                    // repeat, release and group-navigation methods.
+                    activated=0;
+                    var pinnedFormRouter=new ShortcutRouter(command=>{
+                        switch(command){
+                            case SwitchCommand.PinnedNext:form.OpenSwitcher(true,1);break;
+                            case SwitchCommand.PinnedPrevious:form.OpenSwitcher(true,-1);break;
+                            case SwitchCommand.Next:form.OpenSwitcher(false,1);break;
+                            case SwitchCommand.Pin:form.PinSelection();break;
+                            case SwitchCommand.Commit:form.NavigationReleased();break;
+                            case SwitchCommand.Cancel:form.Dismiss(false);break;
+                        }
+                    });
+                    void PinnedGesture(bool shift=false){pinnedFormRouter.Route(9,true,true,true,shift,true);pinnedFormRouter.Route(9,false,true,true,shift,true);pinnedFormRouter.Route(0xA2,false,true,false,shift,true);pinnedFormRouter.Route(0xA4,false,false,false,shift,true);if(shift)pinnedFormRouter.Route(0xA0,false,false,false,false,true);}
+                    PinnedGesture();Check(mode+" CtrlAltTab은 숨김 상태에서 실제 고정 화면을 엶",form.Visible&&form.IsPersistent&&activated==0);
+                    form.NavigationReleased();Check(mode+" 고정 화면은 잔여 해제 명령에도 닫히지 않음",form.Visible&&activated==0);
+                    form.PrepareNavigationTest(navigationRows,true);PinnedGesture();Check(mode+" CtrlAltTab 반복은 닫지 않고 다음 앱 선택",form.Visible&&form.IsPersistent&&form.NavigationState.Selected==200&&activated==0);
+                    PinnedGesture(true);Check(mode+" CtrlAltShiftTab은 이전 앱 선택",form.Visible&&form.NavigationState.Selected==101);
+                    form.TestKey(Keys.Enter);form.NavigationReleased();Check(mode+" 고정 Chrome 묶음 Enter 진입 후에도 유지",form.Visible&&form.NavigationState.Count==4&&activated==0);
+                    form.TestKey(Keys.Back);form.TestKey(Keys.Enter);form.TestKey(Keys.Tab);form.TestKey(Keys.Enter);Check(mode+" 고정 화면 Enter로 선택 개별 창 확정",activated==102&&!form.Visible);
+                    activated=0;form.PrepareNavigationTest(navigationRows);form.Show();pinnedFormRouter.Route(9,true,true,false,false,true);pinnedFormRouter.Route(9,false,true,false,false,true);var beforePin=form.NavigationState.Selected;
+                    pinnedFormRouter.Route(0xA2,true,true,false,false,true);pinnedFormRouter.Route(0xA4,false,false,true,false,true);pinnedFormRouter.Route(0xA2,false,false,false,false,true);
+                    Check(mode+" 늦게 누른 Ctrl도 현재 선택을 유지하며 고정",form.Visible&&form.IsPersistent&&form.NavigationState.Selected==beforePin&&activated==0);
+                    form.TestKey(Keys.Escape);Check(mode+" 고정 화면 Esc는 전환 없이 닫힘",!form.Visible&&activated==0);
+                    form.PrepareNavigationTest(navigationRows);form.Show();pinnedFormRouter.Route(9,true,true,false,false,true);pinnedFormRouter.Route(9,false,true,false,false,true);pinnedFormRouter.Route(0xA4,false,false,false,false,true);
+                    Check(mode+" 고정 화면 취소 뒤 일반 AltTab은 키 해제로 전환",!form.Visible&&activated==200);
                 } finally {form.Shutdown();}
             }
         }
