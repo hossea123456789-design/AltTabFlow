@@ -51,8 +51,28 @@ jobs:
       - name: Upload basic navigation test report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.5-navigation-self-test
+          name: AltTabFlow-v1.1.6-navigation-self-test
           path: artifacts/ci-tests/self-test.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Validate new UI tests (62 cases)
+        shell: pwsh
+        run: |
+          $exe = Join-Path (Get-Location) 'artifacts\ci-publish\AltTabFlow.exe'
+          $test = Start-Process -FilePath $exe -ArgumentList '--ui-self-test' -WindowStyle Hidden -Wait -PassThru
+          $file = Join-Path $env:LOCALAPPDATA 'AltTabFlow\ui-test.json'
+          if (!(Test-Path -LiteralPath $file)) { throw 'UI test report missing' }
+          $report = Get-Content -LiteralPath $file -Raw | ConvertFrom-Json
+          $passed = @($report.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
+          Write-Host "UI tests passed=$passed; failures=$($report.failures); DPI=$($report.dpi)"
+          if ($test.ExitCode -ne 0 -or $report.failures -ne 0 -or $passed -ne 62) { throw 'UI regression failed or count mismatch (expected 62)' }
+          New-Item -ItemType Directory -Force 'artifacts\ci-tests' | Out-Null
+          Copy-Item -LiteralPath $file -Destination 'artifacts\ci-tests\ui-test.json'
+      - name: Upload UI test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltTabFlow-v1.1.6-UI-self-test
+          path: artifacts/ci-tests/ui-test.json
           if-no-files-found: error
           retention-days: 30
       - name: Capture actual UI preview on Windows runner
@@ -68,7 +88,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AltTabFlow-actual-Windows-preview
-          path: artifacts/ui-preview/AltTabFlow-1.1.5-actual.png
+          path: artifacts/ui-preview/AltTabFlow-1.1.6-actual.png
+          if-no-files-found: error
+          retention-days: 30
+      - name: Capture actual 1.1.6 settings UI
+        id: settings-screenshot
+        shell: pwsh
+        continue-on-error: true
+        run: .\tools\CaptureSettings.ps1
+      - name: Upload actual settings screenshot
+        if: steps.settings-screenshot.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltTabFlow-v1.1.6-settings-actual-Windows
+          path: artifacts/ui-preview/AltTabFlow-1.1.6-settings-actual.png
           if-no-files-found: error
           retention-days: 30
       - name: Upload candidate for manual Windows validation

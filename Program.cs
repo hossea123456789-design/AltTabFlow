@@ -33,6 +33,8 @@ internal static class Program
         if(args.Contains("--peek-self-test")) { PeekTests.Run(); return; }
         if(args.Contains("--focus-self-test")) { PeekTests.Run(true); return; }
         if(args.Contains("--menu-self-test")) { MenuTests.Run(); return; }
+        if(args.Contains("--ui-self-test")) { UiTests.Run(); return; }
+        if(args.Contains("--ui-preview")){using var preview=new SettingsForm(Preferences.Load(),Array.Empty<WindowInfo>()){PreviewOnly=true};preview.TestPage(2);preview.Show();Native.ShowWindow(preview.Handle,5);Application.Run(preview);return;}
         if(args.Length==2&&args[0]=="--peek-fixture") { PeekTests.RunFixture(args[1]); return; }
         if(args.Length==2&&args[0]=="--focus-fixture") { PeekTests.RunFocusFixture(args[1]); return; }
         if(args.Contains("--dump")) { File.WriteAllText(Path.Combine(Preferences.DataDirectory,"windows.json"),JsonSerializer.Serialize(WindowCatalog.Read().Select(x=>new{hwnd=x.Handle.ToInt64(),x.Title,x.AppName,x.ProcessName,x.Path,x.Minimized}),new JsonSerializerOptions{WriteIndented=true})); return; }

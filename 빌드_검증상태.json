@@ -1,19 +1,20 @@
 {
-  "version": "1.1.5",
-  "sourceFiles": 27,
-  "modifiedSourceFiles": 6,
-  "patchBase": "1.1.4",
-  "staticPatchCheck": "PASS",
-  "localSourceGitBlobMatch": "PASS (6 files)",
+  "version": "1.1.6",
+  "sourceFiles": 29,
+  "changedOrNewSourceFiles": 8,
+  "patchBase": "1.1.5",
+  "verifiedLocalVsGithubBlobs": true,
   "githubWindowsBuild": "PENDING",
-  "githubBasicTests": "PENDING",
-  "localWindowsTests": "NOT_RUN_IN_THIS_SESSION",
+  "githubBasic117": "PENDING",
+  "githubUI62": "PENDING",
+  "manualWindowsTests": "NOT_RUN_IN_THIS_SESSION",
   "handoffReportedPassed": {
     "basic": 117,
     "peek": 10,
     "menu": 7,
     "focus": 18,
-    "uniqueTotal": 142,
+    "ui": 62,
+    "unique": 204,
     "overlap": 10
   }
 }
