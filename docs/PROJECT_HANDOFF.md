@@ -1,12 +1,22 @@
 # AltTabFlow — 후속 세션 인계 / START HERE
 
+## 1.1.12 최신 확정 배포 결과 (2026-11-11)
+
+- **main 1.1.12**: [PR #10 병합](https://github.com/hossea123456789-design/AltTabFlow/pull/10), [main Windows CI #42850336840 성공](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42850336840): 기본206 + UI85 + updater22 + 관리자 시작11 = **324/324 자동 검사 통과**.
+- **단일 Public 저장소**: `hossea123456789-design/AltTabFlow` 공개 상태 확인. 두 번째 저장소/PAT/배포 Secret 필요 없음.
+- **자동 공개 릴리스 게시 실제 성공**: [Actions #42850768898](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42850768898), [v1.1.12 Release](https://github.com/hossea123456789-design/AltTabFlow/releases/tag/v1.1.12) 두 자산 확인: `AltTabFlow-win-x64.zip` (70,529,517바이트, SHA-256 `54c7755a7d40c9fa4f95ba31bfb7b2b1a39e2906843c2156a7062f936cf97ea4`) 및 `SHA256SUMS.txt`.
+- **사용자 최초 전환**: 1.1.11 이하에서는 이 1.1.12 공개 ZIP을 직접 받아 기존 실행 파일을 완전히 종료하고 한 번 교체. 이후 내장 '업데이트 확인'은 같은 Public Releases에서 토큰 없이 동작하도록 구현됨.
+- **미검증**: 실제 메이플스토리 Alt+Enter 독점 전체화면/UAC·예약 작업, 다음 공개 버전으로 인앱 다운로드→파일 교체→재시작 종단간. WinForms CI 시뮬레이션과 혼동 금지.
+- 아래의 구버전 기록은 *당시 상태의 히스토리*이므로 현재 배포 안내보다 우선하지 않음.
+
+
 > **이 문서가 프로젝트의 단일 인계 시작점입니다.** 새로운 ChatGPT/개발 세션에서는 이 문서와 실제 `main` 코드, 최근 PR/CI, Issue #1을 먼저 읽으세요. 이전 채팅 기록이나 특정 컴퓨터의 파일 경로가 없어도 이어서 개발할 수 있어야 합니다.
 
 ## 저장소 및 현재 기준
 
 - 저장소: [hossea123456789-design/AltTabFlow](https://github.com/hossea123456789-design/AltTabFlow) (**Private**)
 - 기본 브랜치: `main`; 변경은 `update/vX.Y.Z-...` 브랜치와 Pull Request로 진행.
-- **1.1.12 단일 Public 저장소 전환 PR 진행:** `feature/v1.1.12-single-public-repo-auto-release`에서 별도 `AltTabFlow-Downloads` 및 배포 PAT 의존성 제거, 동일 저장소 Release API + GITHUB_TOKEN 배포. GitHub 연결로 repo visibility 변경은 불가능하므로 **사용자의 일회성 Public 전환 필요**. 승인 전 실제 공개 릴리스가 생성됐다고 주장하지 말 것.
+- **1.1.12 단일 Public 저장소 전환 완료 (기존 작성 당시 PR 진행):** `feature/v1.1.12-single-public-repo-auto-release`에서 별도 `AltTabFlow-Downloads` 및 배포 PAT 의존성 제거, 동일 저장소 Release API + GITHUB_TOKEN 배포. GitHub 연결로 repo visibility 변경은 불가능하므로 **사용자의 일회성 Public 전환 필요**. 승인 전 실제 공개 릴리스가 생성됐다고 주장하지 말 것.
 - **직전 `main`: 1.1.11.** [PR #9](https://github.com/hossea123456789-design/AltTabFlow/pull/9) [성공 Windows CI #42842347985](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) 검증 후 [커밋 93fd8ce](https://github.com/hossea123456789-design/AltTabFlow/commit/93fd8ceb7e4fef0114a7ba941b9a1c78100493f7)로 병합 완료. 기본206 + UI85 + 업데이터22 + 관리자 시작11 = **324/324개 자동 검사 통과**. 실행 후보 ZIP·메인/설정/업데이트 WinForms 캡처 업로드 성공. **공개 실행 파일 저장소 미생성·실제 MapleStory/온라인 갱신 검증 미실행은 별도**.
 - **이전 기준 1.1.10:** [PR #8](https://github.com/hossea123456789-design/AltTabFlow/pull/8)을 [Windows 성공 CI #42832500112](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 이후 [커밋 0841c00](https://github.com/hossea123456789-design/AltTabFlow/commit/0841c00da08fa5287e971197894dfd2987b4ac14)로 병합했습니다. SHA-256·컴파일·단일 EXE·기본206/UI80/업데이터11/관리자 시작11 = **308개 CI 검사 성공**, 실제 메인·설정·업데이트 창 캡처 및 ZIP 업로드 성공.
 - **1.1.9 과거 기준:** 1.1.9, [PR #7](https://github.com/hossea123456789-design/AltTabFlow/pull/7)을 [Windows 성공 CI #42812687675](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42812687675) 이후 [커밋 51175f3](https://github.com/hossea123456789-design/AltTabFlow/commit/51175f30dd9c0e0aa8792593e3956703f7f24e8d)로 병합했습니다. 체크섬·컴파일·단일 EXE 게시·기본 206/206·UI 71/71·Updater 11/11·실제 메인/설정 캡처 및 동일 폴더 배포 후보 업로드까지 성공했습니다.

@@ -109,3 +109,11 @@ dotnet build .\AltTabFlow.csproj -c Release
 - [ ] 기존 릴리스 덮어쓰기 거부, SHA-256/버전 불일치 시 기존 실행본 유지
 - [ ] 프로그램에서 익명 Release 조회·ZIP 다운로드·백업/교체/재시작 성공
 - [ ] 메이플 Alt+Enter 실기기/독점 전체화면 및 관리자 로그인 재현 여부 별도 확인
+
+## 1.1.12 공개 릴리스 확정 (2026-11-11)
+
+- [x] [main CI #42850336840](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42850336840): SHA-256, Windows .NET 8, 기본206/UI85/Updater22/Startup11 = 324/324, 실행 ZIP·WinForms 화면 캡처 성공
+- [x] 단일 기존 저장소 `AltTabFlow` Public 확인
+- [x] [공개 릴리스 게시 Actions #42850768898](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42850768898) 성공; [v1.1.12 ZIP + SHA256SUMS](https://github.com/hossea123456789-design/AltTabFlow/releases/tag/v1.1.12) 실제 게시
+- [ ] 사용자 PC 실제 MapleStory Alt+Enter 독점 전체화면/포커스 전환
+- [ ] 차기 버전으로 앱 버튼의 다운로드·EXE 교체·재시작 종단간 실사용
