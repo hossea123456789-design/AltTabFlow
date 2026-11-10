@@ -7,7 +7,7 @@ try {
     if (-not [Environment]::OSVersion.Platform.Equals([PlatformID]::Win32NT)) {
         throw 'Windows에서만 실행할 수 있습니다.'
     }
-    Write-Host 'AltTabFlow 1.1.5 소스 복원본: Windows 배포 빌드' -ForegroundColor Cyan
+    Write-Host 'AltTabFlow 1.1.6 소스 복원본: Windows 배포 빌드' -ForegroundColor Cyan
     Write-Host '원본 동작/소스는 변경하지 않고 package.ps1을 실행합니다.'
     $dotnet = Get-Command 'dotnet.exe' -ErrorAction SilentlyContinue
     $hasSdk8 = $false
