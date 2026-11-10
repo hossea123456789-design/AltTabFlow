@@ -5,7 +5,7 @@ Add-Type -AssemblyName System.Drawing
 $root=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $fixturePath=Join-Path $root 'tools\TestWindows\bin\Release\net8.0-windows\AltTabFlowTest.exe'
 $exe=Join-Path $root 'artifacts\ci-publish\AltTabFlow.exe'
-$output=Join-Path $root 'artifacts\ui-preview\AltTabFlow-1.1.10-actual.png'
+$output=Join-Path $root 'artifacts\ui-preview\AltTabFlow-1.1.11-actual.png'
 if(-not (Test-Path $fixturePath)){throw "Missing fixture: $fixturePath"}
 if(-not (Test-Path $exe)){throw "Missing executable: $exe"}
 $folder=Join-Path $env:LOCALAPPDATA 'AltTabFlow'
