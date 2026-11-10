@@ -1,5 +1,5 @@
 {
-  "version": "1.1.13",
+  "version": "1.1.14",
   "patchBase": "1.1.9",
   "changedSourceFiles": 9,
   "sourceFiles": 29,
@@ -26,7 +26,7 @@
   "githubActualScreenshots": "PASS main/settings/updater (CI #42842347985)",
   "mainMergeCommit": null,
   "githubBuiltExeSha256": "8c376e3f0db38e2cdfd2afaac9b9882d8ceecff1d3f2a0d747834407d9c8b658",
-  "baseVersion": "1.1.12",
+  "baseVersion": "1.1.13",
   "githubUpdater11": "PASS (11/11, CI 42832500112)",
   "elevatedGamePhysicalTest": "NOT_RUN",
   "fullUpdaterEndToEnd": "NOT_RUN",
@@ -54,8 +54,11 @@
   "githubMainCI": 42850336840,
   "publicZipSha256": "54c7755a7d40c9fa4f95ba31bfb7b2b1a39e2906843c2156a7062f936cf97ea4",
   "publicZipBytes": 70529517,
-  "githubUi96": "PENDING",
-  "githubRelease": "PENDING",
+  "githubUi96": "PASS (96/96 PR #11 CI 42855755651)",
+  "githubRelease": "PENDING v1.1.14",
   "userReportedGamePreviewFocusBug": "MapleStory row selected after Alt+Enter briefly hides chooser for 1-2 AltTabs",
-  "userReportedPreviewTextOverlap": "MapleStory window title overlaps redundant preview footer label"
+  "userReportedPreviewTextOverlap": "MapleStory window title overlaps redundant preview footer label",
+  "githubUi99": "PENDING 1.1.14 PR Windows CI",
+  "rapidAltTabReport": "Very fast repeated Alt+Tab leaves chooser open, then delayed dismiss and subsequent input apparently dead",
+  "rapidInputQueueFix": "BOUNDED_FIFO_DRAIN 48 events/8ms, finally reschedule, deduplicate foreground activation"
 }
