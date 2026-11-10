@@ -1,3 +1,10 @@
+## 1.1.14 · 빠른 Alt+Tab 연타 시 UI 지연·이후 입력 먹통 방지 (2026-11-11)
+
+- 사용자 보고: Alt+Tab을 빠르게 여러 번 반복하면 선택 UI가 남았다가 뒤늦게 닫히고 그 후 Alt+Tab이 먹통처럼 동작.
+- `SwitcherContext.DrainInput`은 UI 스레드에서 큐 전체를 반복 `ToArray()`하고 큐가 빌 때까지 루프. 입력 폭주에서 WinForms Paint·Commit watchdog 굶김 가능. 처리 중 중복 `BeginInvoke`도 원인 후보.
+- v1.1.14 패치: 최대 48명령/8ms로 처리 분할 및 나머지 FIFO 재예약, `drainPosted` 해제/재게시 보장, 전환기 이미 foreground일 때 불필요한 activation 작업 억제.
+- 기본206+UI99+updater22+startup11=338개 CI 목표. 실제 메이플 Alt+Enter/물리 키 반복은 사용자 Windows 별도 검증.
+
 ## 1.1.13 · 메이플 Alt+Enter 전환기 가려짐/미리보기 겹침 수정 (2026-11-11)
 
 - 사용자가 MapleStory 확대(Alt+Enter) 후 전환 목록에서 MapleStory 항목을 한 번 지나가면 전환 UI가 사라졌다가 2회 정도 다른 창을 오가면 다시 표시된다고 보고. 메이플 창 미리보기 카드 하단 안내/창 제목 겹침 스크린샷 제공.
