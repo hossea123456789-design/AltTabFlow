@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$fixturePath=Join-Path $root 'tools\TestWindows\bin\Release\net8.0-windows\TestWindows.exe'
+$fixturePath=Join-Path $root 'tools\TestWindows\bin\Release\net8.0-windows\AltTabFlowTest.exe'
 $exe=Join-Path $root 'artifacts\ci-publish\AltTabFlow.exe'
 $output=Join-Path $root 'artifacts\ui-preview\AltTabFlow-1.1.2-actual.png'
 if(-not (Test-Path $fixturePath)){throw "Missing fixture: $fixturePath"}
