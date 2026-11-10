@@ -68,7 +68,7 @@ jobs:
           $report = Get-Content -LiteralPath $file -Raw | ConvertFrom-Json
           $passed = @($report.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
           Write-Host "UI tests passed=$passed; failures=$($report.failures); DPI=$($report.dpi)"
-          if ($test.ExitCode -ne 0 -or $report.failures -ne 0 -or $passed -ne 71) { throw 'UI regression failed or count mismatch (expected 62)' }
+          if ($test.ExitCode -ne 0 -or $report.failures -ne 0 -or $passed -ne 71) { throw 'UI regression failed or count mismatch (expected 71)' }
           New-Item -ItemType Directory -Force 'artifacts\ci-tests' | Out-Null
           Copy-Item -LiteralPath $file -Destination 'artifacts\ci-tests\ui-test.json'
       - name: Upload UI test report

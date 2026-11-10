@@ -63,7 +63,7 @@ internal sealed class SettingsForm : Form
         LabelAt(maintenance,GameCompatibility.StatusText,18,44,562,38,9,false,true);
         var gameMode=new FlowButton{Text=GameCompatibility.IsElevated?"관리자 모드 실행 중":"게임 호환: 관리자 권한으로 재시작",AccessibleName="게임 호환 관리자 권한으로 다시 시작"};
         Place(maintenance,gameMode,18,87,275,40);gameMode.Click+=(_,_)=>GameCompatibility.RequestElevatedRestart(this);
-        var update=new FlowButton{Text="업데이트 확인 · 자동 설치",Primary=true,AccessibleName="GitHub 최신 업데이트 확인 및 설치"};
+        var update=new FlowButton{Text="업데이트 확인 · 자동 설치",AccessibleName="GitHub 최신 업데이트 확인 및 설치"};
         Place(maintenance,update,307,87,275,40);
         var updateStatus=LabelAt(maintenance,"비공개 GitHub 연결은 최초 1회 읽기 전용 인증이 필요합니다.",18,140,558,52,9,false,true);
         update.Click+=async (_,_)=>{
