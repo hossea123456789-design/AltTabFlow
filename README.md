@@ -2,7 +2,7 @@
 
 **세션 간 후속 작업 시작점: [PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md)** · [전체 개발 이력](docs/DEVELOPMENT_HISTORY.md) · [동작 불변 조건](docs/ARCHITECTURE_AND_INVARIANTS.md) · [검증 매트릭스](docs/TEST_MATRIX.md)
 
-Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.12**입니다.
+Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.13**입니다.
 
 > **업데이트/배포:** 기존 저장소 `hossea123456789-design/AltTabFlow` 자체가 Public인 경우 같은 저장소의 공개 Releases에서 익명으로 버전과 SHA-256을 확인하고 앱 버튼으로 교체합니다. 별도의 `AltTabFlow-Downloads` 저장소나 배포 PAT는 불필요합니다. **저장소 Public 및 [v1.1.12 공개 릴리스 게시 완료](https://github.com/hossea123456789-design/AltTabFlow/releases/tag/v1.1.12).**
 
@@ -19,6 +19,15 @@ Alt+Enter로 확장된 메이플스토리가 최대화 또는 전체화면 상�
 설정 → 업데이트 확인으로 **같은 공개 GitHub 저장소**의 Releases에서 새로운 Windows EXE를 받습니다. 사용자 GitHub 로그인/PAT는 요구하지 않습니다. 자동 배포는 성공한 Windows CI와 같은 `main` SHA의 실행 파일만 사용하고, `GITHUB_TOKEN`으로 공개 프리릴리스를 생성합니다. 앱은 업로드된 ZIP의 SHA-256과 EXE 버전을 검증하고 재시작합니다.
 
 **최초 공개 전환 절차(현재 완료):** GitHub 관리 권한 보유자가 저장소 Settings → General → Danger Zone → Change repository visibility → Public을 한 번 승인해야 합니다. 자동 배포 워크플로는 Private 상태에서 릴리스를 만들지 않으며, Public으로 전환하면 GitHub의 `public` 이벤트가 배포 작업을 자동 실행합니다. 별도 Actions 수동 실행은 필요하지 않습니다. 저장소 공개는 과거 커밋·이슈·로그까지 공개될 수 있어 사전 점검이 필요합니다.
+
+## 1.1.13: 메이플스토리 Alt+Enter 전환창 사라짐·미리보기 글자 겹침 수정
+
+- 사용자 실기기 보고: Alt+Enter로 메이플스토리 확대 후 AltTabFlow에서 **MapleStory 항목을 한 번 거치면 전환창이 화면 뒤로 사라짐**, 2회 정도 다른 Alt+Tab을 누른 뒤 돌아오는 재현. 선택 창 미리보기의 **"선택한 창 미리보기" 안내와 MapleStory 제목이 서로 겹침**.
+- 코드 원인 후보: 기존 `TargetPeek.Select`가 게임 HWND를 전환기 바로 뒤의 **topmost band로 승격**해 전체화면 게임의 포커스/합성 우선순위를 흔듦. 1.1.13에서는 선택 항목이 MapleStory인 동안 게임 HWND를 건드리는 Peek/Dim/Aura를 건너뜁니다. 전환기 내부 **DWM 창 썸네일은 유지**합니다.
+- 실제 Alt 키가 계속 눌린 짧은 전환 세션이나 220ms 이내의 전환 직후에는 일시적인 Deactivate 이벤트로 UI를 닫지 않음. 일반 모드의 마지막 키 해제 Commit·고정 모드 해제 동작 유지.
+- 미리보기 카드의 중복 하단 안내를 제거하고 제목 높이를 하단 실행 버튼 위로 제한해 UI 축척에 따른 겹침을 차단.
+- 자동 UI 회귀 검사 11개 신규: 게임 Peek 판정 3, Deactivate 세션 4, 4개 화면 높이의 텍스트 영역 배치.
+- **검증 한계:** CI의 일반 Windows 최대화 창은 메이플 실제 Alt+Enter·독점 전체화면·보호 드라이버 환경을 재현하지 못합니다. 실기기 재현/수동 테스트가 필요합니다.
 
 ## 주요 기능
 

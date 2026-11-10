@@ -136,6 +136,29 @@ internal static class UiTests
                 SwitcherForm.CommitDeadlineMs>=WindowActivation.ActivationDeadlineMs&&
                 SwitcherForm.CommitDeadlineMs<=1500);
         }finally{overlayTest.Close();overlayTest.Dispose();gameOrigin.Close();gameOrigin.Dispose();}
+        // MapleStory fullscreen focus regression: merely highlighting the
+        // game's row must not promote its HWND or create extra topmost FX.
+        var maple=new WindowInfo(8001,"MapleStory","MapleStory","MapleStory","C:/Games/MapleStory.exe",0,false);
+        Check("MapleStory selected row skips external HWND Peek effects",
+            SwitcherForm.ShouldAvoidGamePeek(maple));
+        Check("MapleStory process match ignores case",
+            SwitcherForm.ShouldAvoidGamePeek(maple with{ProcessName="maplestory",AppName="Game"}));
+        Check("Chrome preview still retains existing Peek behavior",
+            !SwitcherForm.ShouldAvoidGamePeek(windows[0]));
+        Check("normal Alt+Tab survives temporary game focus loss while Alt held",
+            SwitcherForm.ShouldRetainOnDeactivate(false,true,false,false));
+        Check("recent normal Alt+Tab survives transient focus transition",
+            SwitcherForm.ShouldRetainOnDeactivate(false,false,false,true));
+        Check("pinned switcher does not retain focus after unrelated app activation",
+            !SwitcherForm.ShouldRetainOnDeactivate(true,false,false,false));
+        Check("return to origin foreground retains visible chooser",
+            SwitcherForm.ShouldRetainOnDeactivate(false,false,true,false));
+        foreach(float height in new[]{580f,650f,735f,950f}){
+            var sidebar=SwitcherForm.LayoutPreviewSidebar(height);
+            Check($"preview text never overlaps action button at logical height {height}",
+                sidebar.ImageHeight>0&&sidebar.AppY+25<sidebar.TitleY&&
+                sidebar.TitleY+sidebar.TitleHeight<=sidebar.ButtonY-11);
+        }
         using(var catalog=new CatalogService())foreach(string view in new[]{"목록","카드","아이콘"}){
             nint activated=0;var prefs=new Preferences{View=view,ColorPreset="rose",ShowPreview=false,HighlightTarget=false,PeekTarget=false,EmphasizeTarget=false};
             using var form=new SwitcherForm(prefs,catalog,h=>{activated=h;return true;}){InspectionMode=true};

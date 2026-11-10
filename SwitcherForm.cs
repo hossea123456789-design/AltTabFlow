@@ -41,7 +41,7 @@ internal sealed class SwitcherForm : Form
     private readonly bool nativeActivation;
     private bool committing, presenting, requestAccepted;
     private nint commitTarget;
-    private long commitStarted, releaseTimestamp;
+    private long commitStarted, releaseTimestamp, lastNavigationTick;
     public bool IsCommitting=>committing;
     public Action? CommitFinished;
     private volatile bool catalogDirty;
@@ -102,7 +102,14 @@ internal sealed class SwitcherForm : Form
             if(!Visible||configuring||InspectionMode)return;
             // A maximized game may immediately reclaim foreground after
             // Show(). Don't close the switcher and lose the user's key-up.
-            if(ShouldKeepOverlayOnGameFocus(Native.GetForegroundWindow(),origin)){
+            nint foreground=Native.GetForegroundWindow();
+            // While the real Alt key is held, foreground churn from a game
+            // (especially after Alt+Enter) must not silently kill our session.
+            // Pinned sessions still dismiss when focus genuinely leaves.
+            bool altHeld=AltPhysicallyHeld();
+            bool recent=lastNavigationTick!=0&&Stopwatch.GetElapsedTime(lastNavigationTick).TotalMilliseconds<220;
+            if(ShouldRetainOnDeactivate(persistent,altHeld,
+                ShouldKeepOverlayOnGameFocus(foreground,origin),recent)){
                 BeginInvoke((Action)(()=>{
                     if(Visible&&!committing&&!configuring)ReassertOverlayZOrder();
                 }));
@@ -120,7 +127,9 @@ internal sealed class SwitcherForm : Form
         };
         refreshUi.Tick += (_, _) => {
             if(Visible&&!configuring&&!committing&&!InspectionMode&&
-               ShouldKeepOverlayOnGameFocus(Native.GetForegroundWindow(),origin))
+               ShouldRetainOnDeactivate(persistent,AltPhysicallyHeld(),
+                   ShouldKeepOverlayOnGameFocus(Native.GetForegroundWindow(),origin),
+                   lastNavigationTick!=0&&Stopwatch.GetElapsedTime(lastNavigationTick).TotalMilliseconds<220))
                 ReassertOverlayZOrder();
             if (!Visible || configuring || !catalogDirty) return;
             catalogDirty = false;
@@ -135,6 +144,25 @@ internal sealed class SwitcherForm : Form
     private void OnCatalogUpdated() { catalogDirty = true; }
     internal static bool ShouldKeepOverlayOnGameFocus(nint foreground,nint origin)
         =>foreground!=0&&origin!=0&&WindowIdentity.Same(foreground,origin);
+    internal static bool ShouldRetainOnDeactivate(bool pinned,bool altHeld,bool originForeground,bool recentNavigation)
+        =>originForeground||(!pinned&&(altHeld||recentNavigation));
+    internal static bool ShouldAvoidGamePeek(WindowInfo window)
+        =>window.ProcessName.Equals("MapleStory",StringComparison.OrdinalIgnoreCase)
+           ||window.AppName.Equals("MapleStory",StringComparison.OrdinalIgnoreCase);
+    private static bool AltPhysicallyHeld()
+        =>(Native.GetAsyncKeyState(0x12)&0x8000)!=0 ||
+          (Native.GetAsyncKeyState(0xA4)&0x8000)!=0 ||
+          (Native.GetAsyncKeyState(0xA5)&0x8000)!=0;
+    internal readonly record struct PreviewSidebar(float ImageHeight,float AppY,float TitleY,float TitleHeight,float ButtonY);
+    internal static PreviewSidebar LayoutPreviewSidebar(float height){
+        // Fixed footer button; never paint a multi-line title beneath it.
+        float imageHeight=Math.Clamp(Math.Min(247,height-456),48,247);
+        float appY=229+16+imageHeight+20;
+        float titleY=appY+35;
+        float buttonY=height-125;
+        float titleHeight=Math.Clamp(buttonY-titleY-12,0,63);
+        return new PreviewSidebar(imageHeight,appY,titleY,titleHeight,buttonY);
+    }
     private void ReassertOverlayZOrder(){
         if(!Visible||IsDisposed||InspectionMode)return;
         if(!KeepOverlayAboveGame(Handle))
@@ -165,6 +193,7 @@ internal sealed class SwitcherForm : Form
     public void TrackForeground(nint hwnd)=>TrackForeground(hwnd,unchecked((uint)Environment.TickCount));
     public void OpenSwitcher(bool pinned, int direction = 1, bool sameApp = false) {
         if(committing)return;
+        lastNavigationTick=Stopwatch.GetTimestamp();
         // Each Alt+Tab gesture selects its own lifetime. A previously pinned UI
         // must not prevent a new plain gesture from committing on key release.
         if (Visible) { persistent = pinned; releaseTimestamp=0;if(!pinned)ActiveControl=null;ReassertOverlayZOrder();activation.Request(Handle); MoveSelection(direction); return; }
@@ -233,17 +262,25 @@ internal sealed class SwitcherForm : Form
         Invalidate();
     }
     private void EnsurePage() { page = selected / Math.Max(1, pageSize); }
-    public void MoveSelection(int offset) { if (entries.Count == 0) return; selected = Mod(selected+offset, entries.Count); EnsurePage(); UpdateAura(); Invalidate(); }
+    public void MoveSelection(int offset) { if (entries.Count == 0) return; lastNavigationTick=Stopwatch.GetTimestamp(); selected = Mod(selected+offset, entries.Count); EnsurePage(); UpdateAura(); Invalidate(); }
     private void UpdateAura(){
         visualTimer.Stop();
-        if(!Visible||configuring||committing||selected>=entries.Count){HideTargetVisuals();return;}
+        if(!Visible||configuring||committing||selected>=entries.Count||
+           ShouldAvoidGamePeek(entries[selected].Window)){HideTargetVisuals();return;}
         // A timer is lower priority than queued keyboard commands. Rapid Tabs
         // coalesce to the last target; Alt-up never waits for another FX repaint.
         visualTimer.Start();
     }
     private void ApplyTargetVisuals(){
         if(!Visible||configuring||selected>=entries.Count){HideTargetVisuals();return;}
-        nint hwnd=entries[selected].Window.Handle;
+        var selectedWindow=entries[selected].Window;
+        // DO NOT promote MapleStory into the chooser's topmost band just
+        // because its row becomes selected. Alt+Enter/fullscreen games can
+        // take over the compositor for one or two subsequent Alt+Tab cycles.
+        // DWM thumbnail inside the chooser still works; only external game
+        // Peek/Dim/Aura surfaces are suppressed.
+        if(ShouldAvoidGamePeek(selectedWindow)){HideTargetVisuals();return;}
+        nint hwnd=selectedWindow.Handle;
         if(prefs.PeekTarget)peek.Select(hwnd,Handle);else peek.Restore();
         if(prefs.EmphasizeTarget)dimmer.Select(hwnd,Handle);else dimmer.Hide();
         if(prefs.HighlightTarget)aura.Select(hwnd,Handle,Accent,prefs.EmphasizeTarget);else aura.Hide();
@@ -256,7 +293,7 @@ internal sealed class SwitcherForm : Form
         bool wasCommitting=committing;
         activation.Cancel();
         commitTimer.Stop();committing=false;
-        refreshUi.Stop(); opening=null; HideTargetVisuals(); ClearThumbnails(); Hide(); persistent=false;
+        refreshUi.Stop(); opening=null; lastNavigationTick=0; HideTargetVisuals(); ClearThumbnails(); Hide(); persistent=false;
         if (restore && Native.IsWindow(origin)) activation.Request(origin);
         if(wasCommitting)CommitFinished?.Invoke();
     }
@@ -473,14 +510,19 @@ internal sealed class SwitcherForm : Form
         var selectedEntry=entries[selected]; var w=selectedEntry.Window;
         float px=28+listWidth+20, pw=W-28-px, py=229;
         Box(g,R(px,py,pw,H-300),Surface,12);
-        var preview=R(px+16,py+16,pw-32,Math.Min(247,H-456));
+        var sidebar=LayoutPreviewSidebar(H);
+        var preview=R(px+16,py+16,pw-32,sidebar.ImageHeight);
         PaintPreview(g,w,preview);
-        float ty=py+16+preview.Height/scale+20;
-        Txt(g,w.AppName,R(px+20,ty,pw-40,25),16,Ink,true);
-        Txt(g,w.Title,R(px+20,ty+35,pw-40,63),14,Muted,false,true);
-        string tag=w.Minimized?"최소화된 창 · 선택하면 복원":"선택한 창 미리보기";
-        Txt(g,tag,R(px+20,H-160,pw-40,23),11,Muted);
-        Button(g,"이 창으로 전환  ↵",R(px+20,H-125,pw-40,40),Choose,false,"",false,true);
+        Txt(g,w.AppName,R(px+20,sidebar.AppY,pw-40,25),16,Ink,true);
+        // Previous "선택한 창 미리보기" footer was drawn INSIDE this title.
+        // The preview already labels itself; remove redundant footer text.
+        // Clip the window title above the action button at all DPI/UI sizes.
+        if(sidebar.TitleHeight>=12){
+            string subtitle=w.Minimized?"최소화된 창 · 선택하면 복원 | "+w.Title:w.Title;
+            Txt(g,subtitle,R(px+20,sidebar.TitleY,pw-40,sidebar.TitleHeight),
+                14,Muted,false,sidebar.TitleHeight>=29);
+        }
+        Button(g,"이 창으로 전환  ↵",R(px+20,sidebar.ButtonY,pw-40,40),Choose,false,"",false,true);
     }
     private void PaintTiles(Graphics g) {
         int start=page*pageSize; float gap=12, tw=(W-56-(columns-1)*gap)/columns;

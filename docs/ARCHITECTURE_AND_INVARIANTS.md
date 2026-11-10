@@ -93,3 +93,11 @@
 - 릴리스 퍼블리셔는 **같은 저장소**의 `github.token`에 `contents:write`/ `actions:read`만 요청. 배포용 PAT/Secret 및 두 번째 저장소를 도입하지 않습니다.
 - Private 상태에서는 공개 릴리스를 절대로 생성하지 않습니다. Public 전환은 GitHub Admin의 명시적 승인 필요.
 - 신규 릴리스는 반드시 `main` 동일 SHA의 성공한 Windows CI 아티팩트에서만 생성. 배포 파일 화이트리스트 4개와 체크섬, 중복 태그 덮어쓰기 금지.
+
+## 1.1.13 메이플 확대 화면 무작위 가려짐·미리보기 글자 겹침 회귀 계약
+
+- **선택 리스트를 탐색하는 행위 자체가 MapleStory의 실제 HWND TopMost/Z-order를 변경하면 안 됩니다.** `SwitcherForm.ShouldAvoidGamePeek` 판정의 게임은 `TargetPeek.Select`, `TargetDimmer.Select`, `TargetAura.Select`를 모두 생략하되 오른쪽 DWM 썸네일은 계속 표시합니다.
+- 일반 Alt+Tab 세션에서 사용자가 물리 Alt를 계속 누르는 동안 또는 마지막 탐색 키 이벤트 후 220ms 동안의 Deactivate는 전환 UI를 즉시 해제하지 않습니다. 이전 기원 창 재획득 시 유지를 허용하지만, 핀 세션에서 진짜 다른 창으로 포커스 이동하면 닫을 수 있어야 합니다.
+- 오른쪽 미리보기의 창 제목 영역은 하단 전환 버튼과 절대 중첩하지 않고 '선택한 창 미리보기' 안내를 중복 배치하지 않습니다. 580/650/735/950 logical height 테스트와 UI Scale 회귀를 함께 확인합니다.
+- 메이플 게임으로 실제 Commit을 수행할 때는 기존 네이티브 activation을 그대로 사용합니다. 게임 포커스 보호를 위해 무한 반복/포커스 강제 점유/게임 강제 최소화를 도입하지 않습니다.
+- 실제 DXGI 독점 전체화면은 CI WinForms 가짜 창으로 검증할 수 없으므로, GitHub CI 성공과 사용자의 메이플 실측을 분리해 기록합니다.

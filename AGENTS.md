@@ -34,3 +34,10 @@ Before editing code in any new session, read and respect these repository-owned 
 The private GitHub repository is the durable project record, not any particular ChatGPT chat session or local temporary file.
 
 - v1.1.12: user selected ONE PUBLIC repository `hossea123456789-design/AltTabFlow` for source and release. The GitHub app here lacks admin visibility permission: do not claim repo is public until checked. Publisher uses only built-in GITHUB_TOKEN (contents:write/actions:read), never a PAT or another repo. Enforce same main HEAD successful Windows CI. Do not publish any release while repo is private.
+
+## v1.1.13 critical regressions
+
+- MapleStory Alt+Enter expands into a topmost/fullscreen behavior. **Never promote the actual MapleStory HWND** merely by highlighting its list entry. When the selected WindowInfo is MapleStory, suppress TargetPeek/Dimmer/Aura **only**, retain DWM thumbnail in chooser and normal final native activation.
+- While physical Alt is held or within 220ms of a normal navigation event, do not silently dismiss chooser due to a spurious Deactivate. Keep pinned (Ctrl+Alt+Tab) foreground semantics.
+- Preview sidebar window title and bottom action button must not overlap. Do not restore redundant "선택한 창 미리보기" footer text over title. LayoutPreviewSidebar owns the logical vertical bounds.
+- UI self-tests 96, total self-test expected 335 after v1.1.13. Distinguish WinForms fixture tests from actual Maple fullscreen.
