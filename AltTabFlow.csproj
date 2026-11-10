@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>AltTabFlow</AssemblyName>
+    <Version>1.1.2</Version>
+    <Company>Local Tools</Company>
+    <Product>AltTabFlow</Product>
+    <Description>앱별로 정리하는 창 전환기</Description>
+    <ApplicationIcon>Assets\AltTabFlow.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup><EmbeddedResource Include="Assets\AltTabFlow.ico" /><Compile Remove="tools\**\*.cs" /></ItemGroup>
+</Project>

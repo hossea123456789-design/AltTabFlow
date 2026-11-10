@@ -1,0 +1,32 @@
+# Build outputs
+bin/
+obj/
+dist/
+artifacts/
+releases/
+tools/TestWindows/bin/
+tools/TestWindows/obj/
+
+# Local machine state, diagnostics, and private window information
+settings.json
+status.json
+windows.json
+events.jsonl
+events.jsonl.*
+*-test.json
+verification-*.json
+
+# IDE and machine-specific files
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.DS_Store
+Thumbs.db
+
+# Archives / downloaded dependencies
+*.zip
+*.nupkg
