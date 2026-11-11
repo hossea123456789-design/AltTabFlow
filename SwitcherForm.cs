@@ -254,8 +254,17 @@ internal sealed class SwitcherForm : Form
     private void Rebuild(bool keep) {
         int beforeCount=entries.Count;
         nint prev = keep && selected < entries.Count ? entries[selected].Window.Handle : 0;
+        // Preserve the real selected document across title/catalog refresh,
+        // even when that grouped row is not the current highlighted row.
+        var representatives=keep?entries.Where(e=>e.IsGroup)
+            .ToDictionary(e=>e.Window.GroupKey,e=>e.Window.Handle):null;
         entries = WindowCatalog.Build(snapshot, prefs, search.Text, group, monitor);
-        if (prev != 0) { int index = entries.FindIndex(e => e.Windows.Any(w => w.Handle == prev)); if (index >= 0) selected = index; }
+        if(representatives!=null)foreach(var entry in entries)
+            if(representatives.TryGetValue(entry.Window.GroupKey,out var hwnd))entry.SelectWindow(hwnd);
+        if(prev!=0){
+            int index=entries.FindIndex(e=>e.SelectWindow(prev));
+            if(index>=0)selected=index;
+        }
         if(Visible&&beforeCount!=entries.Count&&search.TextLength==0)ApplyBounds();
         selected = Math.Clamp(selected, 0, Math.Max(0, entries.Count-1)); EnsurePage();
         UpdateAura();
@@ -332,13 +341,23 @@ internal sealed class SwitcherForm : Form
         InputTimestamp=releaseTimestamp=0;
     }
     private void ExpandGroup() {
-        if (selected >= entries.Count || !entries[selected].IsGroup) return;
-        group = entries[selected].Window.GroupKey; selected=page=0;
-        updating=true; search.Clear(); updating=false; Rebuild(false);
+        if(selected>=entries.Count||!entries[selected].IsGroup)return;
+        nint target=entries[selected].Window.Handle;
+        group=entries[selected].Window.GroupKey;selected=page=0;
+        updating=true;search.Clear();updating=false;Rebuild(false);
+        RestoreSelection(target);
     }
     private void GoBack() {
-        string? previous=group; group=null; selected=page=0; Rebuild(false);
-        int index=entries.FindIndex(x=>x.Window.GroupKey==previous); if(index>=0){selected=index;EnsurePage();UpdateAura();Invalidate();}
+        nint target=selected<entries.Count?entries[selected].Window.Handle:0;
+        string? previous=group;group=null;selected=page=0;Rebuild(false);
+        if(RestoreSelection(target))return;
+        int index=entries.FindIndex(x=>x.Window.GroupKey==previous);
+        if(index>=0){selected=index;EnsurePage();UpdateAura();Invalidate();}
+    }
+    private bool RestoreSelection(nint target) {
+        int index=entries.FindIndex(e=>e.SelectWindow(target));
+        if(index<0)return false;
+        selected=index;EnsurePage();UpdateAura();Invalidate();return true;
     }
     private void SetView(string mode) { persistent=true; prefs.View=mode; SavePreferences(); ClearThumbnails(); ApplyBounds(); EnsurePage(); Invalidate(); }
     public void DetailedNavigate(Keys key) {
@@ -595,6 +614,10 @@ internal sealed class SwitcherForm : Form
     };
     // Exercise the real keyboard routing on an off-screen form without moving user windows.
     internal void PrepareNavigationTest(List<WindowInfo> windows,bool pinned=false){snapshot=windows;selected=page=0;group=null;persistent=pinned;Rebuild(false);ApplyBounds();}
+    internal void TestInitialSelection(nint current,bool pinned=false,int direction=1){
+        origin=current;persistent=pinned;selected=WindowCatalog.InitialSelection(entries,snapshot,current,pinned,direction);EnsurePage();
+    }
+    internal void TestRefresh(List<WindowInfo> windows){snapshot=windows;Rebuild(true);}
     internal bool TestKey(Keys key){var message=Message.Create(Handle,0x100,(nint)(int)key,0);return ProcessCmdKey(ref message,key);}
     internal void TestMouse(Point point,bool down){var e=new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0);if(down)OnMouseDown(e);else OnMouseUp(e);}
     internal void TestWheel(int delta)=>OnMouseWheel(new MouseEventArgs(MouseButtons.None,0,Width/2,Height/2,delta));
