@@ -570,6 +570,36 @@ internal static class SelfTests
                     Check(mode+" 고정 화면이 남아 있어도 새 일반 AltTab은 빠른 전환 모드",form.Visible&&!form.IsPersistent);
                     pinnedFormRouter.Route(0xA4,false,false,false,false,true);
                     Check(mode+" 남아 있던 고정 화면도 일반 AltTab 해제에 선택 전환 후 닫힘",!form.Visible&&activated==200);
+                    // Same-process workbook MRU, title refresh, group drill-down.
+                    activated=0;form.PrepareNavigationTest(excelMru.ToList());form.TestInitialSelection(301);form.Show();
+                    Check(mode+" Excel 묶음의 첫 전환 대상은 다른 문서 B",form.NavigationState.Group==null&&form.NavigationState.Count==2&&form.NavigationState.Selected==302);
+                    form.TestRefresh(excelMru.Select(w=>w.Handle==302?w with{Title="Excel B 수정.xlsx"}:w).ToList());
+                    Check(mode+" 카탈로그 갱신 뒤에도 Excel B 선택 유지",form.NavigationState.Selected==302);
+                    form.TestKey(Keys.Enter);
+                    Check(mode+" Excel 묶음 진입 시 B를 그대로 하이라이트",form.NavigationState.Group!=null&&form.NavigationState.Count==3&&form.NavigationState.Selected==302);
+                    form.TestKey(Keys.Back);
+                    Check(mode+" Excel 묶음 복귀 시에도 B를 그대로 대표 창으로 유지",form.NavigationState.Group==null&&form.NavigationState.Selected==302);
+                    form.NavigationReleased();Check(mode+" Excel B로 실제 확정 경로 전달 후 닫힘",activated==302&&!form.Visible);
+                    activated=0;form.PrepareNavigationTest(excelMru.ToList());form.TestInitialSelection(301);form.Show();form.MoveSelection(1);
+                    Check(mode+" Excel B 이후 Tab은 표시된 다음 앱으로 이동",form.NavigationState.Selected==303);
+                    form.MoveSelection(-1);Check(mode+" 되돌아온 Excel 묶음은 선택했던 B를 유지",form.NavigationState.Selected==302);
+                    form.TestRefresh(excelMru.Where(w=>w.Handle!=302).ToList());
+                    Check(mode+" Excel B가 닫히면 사라진 HWND를 계속 선택하지 않음",form.NavigationState.Selected!=302);form.Dismiss(false);
+                    // 1.1.10 MRU display mode and user-selectable name sorting.
+                    var recentRows=new[]{Row(801,"zeta","현재 창",0),Row(802,"나무","직전 창",1),Row(803,"Alpha","그 이전 창",2),Row(804,"beta","오래된 창",3)}.ToList();
+                    navigationPrefs.Pinned=new(){"beta"};form.PrepareNavigationTest(recentRows);form.TestInitialSelection(801);
+                    Check(mode+" 기본 첫 AltTab은 MRU 두 번째 창",form.NavigationState.Selected==802);
+                    form.TestKey(Keys.Tab);Check(mode+" Tab 반복은 MRU 세 번째 창",form.NavigationState.Selected==803);
+                    form.TestKey(Keys.Tab);Check(mode+" Tab 반복은 MRU 네 번째 창",form.NavigationState.Selected==804);
+                    form.TestKey(Keys.Shift|Keys.Tab);Check(mode+" ShiftTab은 MRU 역방향",form.NavigationState.Selected==803);
+                    form.TestRefresh(recentRows.Select(w=>w with{Title=w.Title+" 갱신"}).ToList());form.TestKey(Keys.Tab);
+                    Check(mode+" 제목 갱신 중에도 선택과 탐색 순서 고정",form.NavigationState.Selected==804);
+                    navigationPrefs.SortAlphabetically=true;form.PrepareNavigationTest(recentRows);form.TestInitialSelection(801);form.TestKey(Keys.Tab);
+                    Check(mode+" 이름순 옵션을 켜면 다음 Tab은 이름순",form.NavigationState.Selected==803);
+                    navigationPrefs.SortAlphabetically=false;navigationPrefs.Pinned.Clear();
+                    var newRecent=new[]{recentRows[2] with{Order=0},recentRows[0] with{Order=1},recentRows[1] with{Order=2},recentRows[3] with{Order=3}}.ToList();
+                    form.PrepareNavigationTest(newRecent);form.TestInitialSelection(803);form.TestKey(Keys.Tab);
+                    Check(mode+" 새 제스처는 변경된 최근 사용 순 반영",form.NavigationState.Selected==802);
                 } finally {form.Shutdown();}
             }
         }
