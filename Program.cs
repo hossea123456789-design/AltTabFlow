@@ -495,6 +495,57 @@ internal static class SelfTests
             physical.Clear();recovered.ReconcileReleased(false,false,false);
             Check("일반 키와 Alt 해제 모두 통지 누락이어도 실제 상태로 복구",emitted.Count(c=>c==SwitchCommand.Commit)==1);
         }
+        // Reproduce the local 1.1.10 real blocker: Ctrl=false, pinned=false
+        // and VK_APPS still physically down. IME transport keys are likewise
+        // not window-switch release participants.
+        foreach(uint auxiliary in new uint[]{0x5D,0xE5,0xE7})
+        foreach(bool before in new[]{true,false}){
+            var emitted=new List<SwitchCommand>();
+            var physical=new HashSet<uint>{auxiliary};
+            var auxiliaryRouter=new ShortcutRouter(emitted.Add,physical.Contains);
+            bool consumed=false;
+            if(before)consumed=auxiliaryRouter.Route(auxiliary,true,false,false,false,true);
+            auxiliaryRouter.Route(9,true,true,false,false,true);
+            auxiliaryRouter.Route(9,false,true,false,false,true);
+            if(!before)consumed=auxiliaryRouter.Route(auxiliary,true,true,false,false,true);
+            auxiliaryRouter.Route(0xA4,false,false,false,false,true);
+            Check($"제어 키 0x{auxiliary:X2} before={before}: OS down 잔류에도 일반 전환 완료",
+                emitted.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Commit})&&!auxiliaryRouter.IsActive);
+            Check($"제어 키 0x{auxiliary:X2} before={before}: 다른 앱 입력 가로채지 않음",
+                !consumed&&!auxiliaryRouter.Route(0x27,true,false,false,false,true));
+            auxiliaryRouter.Route(0x27,false,false,false,false,true);
+            auxiliaryRouter.Route(auxiliary,false,false,false,false,true);
+            auxiliaryRouter.ReconcileReleased(false,false,false);
+            Check($"제어 키 0x{auxiliary:X2} before={before}: 늦은 해제가 중복 전환을 만들지 않음",
+                emitted.Count(c=>c==SwitchCommand.Commit)==1);
+        }
+        {
+            var emitted=new List<SwitchCommand>();
+            var physical=new HashSet<uint>{0x5D};
+            var auxiliaryRouter=new ShortcutRouter(emitted.Add,physical.Contains);
+            auxiliaryRouter.Route(0x5D,true,false,false,false,true);
+            auxiliaryRouter.Route(9,true,true,false,false,true);
+            auxiliaryRouter.Route(9,false,true,false,false,true);
+            auxiliaryRouter.ReconcileReleased(false,false,false);
+            Check("메뉴 키 잔류와 Alt-up 누락이 겹쳐도 타이머로 해제 완료",
+                emitted.SequenceEqual(new[]{SwitchCommand.Next,SwitchCommand.Commit})&&!auxiliaryRouter.IsActive);
+            emitted.Clear();
+            auxiliaryRouter.Route(9,true,true,true,false,true);
+            auxiliaryRouter.Route(9,false,true,true,false,true);
+            auxiliaryRouter.ReconcileReleased(false,false,false);
+            Check("메뉴 키 잔류 처리 후에도 CtrlAltTab은 고정 유지",
+                emitted.SequenceEqual(new[]{SwitchCommand.PinnedNext})&&!auxiliaryRouter.IsActive);
+            emitted.Clear();
+            auxiliaryRouter.Route(9,true,true,false,false,true);
+            auxiliaryRouter.Route(9,false,true,false,false,true);
+            auxiliaryRouter.Route(0x27,true,true,false,false,true);
+            auxiliaryRouter.Route(0xA4,false,false,false,false,true);
+            Check("메뉴 키는 제외해도 실제 방향키 해제까지 기다림",
+                !emitted.Contains(SwitchCommand.Commit));
+            auxiliaryRouter.Route(0x27,false,false,false,false,true);
+            Check("메뉴 키 잔류 상태에서 마지막 방향키 해제 후 한 번 확정",
+                emitted.Count(c=>c==SwitchCommand.Commit)==1&&!auxiliaryRouter.IsActive);
+        }
         foreach(var viewport in new[]{new Size(4048,2048),new Size(1872,976),new Size(1318,704)}){
             foreach(int count in new[]{17,22}){
                 var layout=LayoutPlanner.Plan(count,viewport.Width,viewport.Height,false);
@@ -600,6 +651,26 @@ internal static class SelfTests
                     var newRecent=new[]{recentRows[2] with{Order=0},recentRows[0] with{Order=1},recentRows[1] with{Order=2},recentRows[3] with{Order=3}}.ToList();
                     form.PrepareNavigationTest(newRecent);form.TestInitialSelection(803);form.TestKey(Keys.Tab);
                     Check(mode+" 새 제스처는 변경된 최근 사용 순 반영",form.NavigationState.Selected==802);
+                    // Actual form plus real router, for normal vs pinned session.
+                    form.PrepareNavigationTest(navigationRows);form.Show();activated=0;
+                    var auxiliaryFormRouter=new ShortcutRouter(command=>{
+                        if(command==SwitchCommand.Next)form.OpenSwitcher(false,1);
+                        if(command==SwitchCommand.Commit)form.NavigationReleased();
+                        if(command==SwitchCommand.PinnedNext)form.OpenSwitcher(true,1);
+                    },key=>key==0x5D);
+                    auxiliaryFormRouter.Route(0x5D,true,false,false,false,true);
+                    auxiliaryFormRouter.Route(9,true,true,false,false,true);
+                    auxiliaryFormRouter.Route(9,false,true,false,false,true);
+                    auxiliaryFormRouter.Route(0xA4,false,false,false,false,true);
+                    Check(mode+" 메뉴 키 down이 남아도 일반 AltTab은 실제 폼 닫고 전환",
+                        !form.Visible&&activated==200&&!auxiliaryFormRouter.IsActive);
+                    form.PrepareNavigationTest(navigationRows);form.Show();activated=0;
+                    auxiliaryFormRouter.Route(9,true,true,true,false,true);
+                    auxiliaryFormRouter.Route(9,false,true,true,false,true);
+                    auxiliaryFormRouter.ReconcileReleased(false,false,false);
+                    Check(mode+" 메뉴 키 제외 후에도 CtrlAltTab 폼은 계속 유지",
+                        form.Visible&&form.IsPersistent&&activated==0);
+                    form.Dismiss(false);
                 } finally {form.Shutdown();}
             }
         }
