@@ -4,7 +4,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $exe = Join-Path $root 'artifacts\ci-publish\AltTabFlow.exe'
-$out = Join-Path $root 'artifacts\ui-preview\AltTabFlow-1.1.14-settings-actual.png'
+$out = Join-Path $root 'artifacts\ui-preview\AltTabFlow-1.1.15-settings-actual.png'
 if (!(Test-Path $exe)) { throw 'EXE missing' }
 $process = $null
 try {
