@@ -2,11 +2,19 @@
 
 **세션 간 후속 작업 시작점: [PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md)** · [전체 개발 이력](docs/DEVELOPMENT_HISTORY.md) · [동작 불변 조건](docs/ARCHITECTURE_AND_INVARIANTS.md) · [검증 매트릭스](docs/TEST_MATRIX.md)
 
-Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.15**입니다.
+Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.16**입니다.
 
 > **업데이트/배포:** 기존 저장소 `hossea123456789-design/AltTabFlow` 자체가 Public인 경우 같은 저장소의 공개 Releases에서 익명으로 버전과 SHA-256을 확인하고 앱 버튼으로 교체합니다. 별도의 `AltTabFlow-Downloads` 저장소나 배포 PAT는 불필요합니다. **저장소 Public 및 [v1.1.12 공개 릴리스 게시 완료](https://github.com/hossea123456789-design/AltTabFlow/releases/tag/v1.1.12).**
 
 > **검증 분리:** 첨부된 1.1.8 인계 명세는 기본 206 + UI 71 + Peek 10 + 메뉴 7 + Focus 18(이미 포함된 Peek 10 중복) = **고유 302개 검사 통과**를 보고합니다. GitHub CI에서는 현재 기본 206개+UI 85개+업데이터 22개+관리자 자동 시작 11개(총 324개)를 별도 검증하며, 실제 전경·메뉴·게임 회귀 검사는 구분합니다.
+
+## 1.1.16 일반 Alt+Tab 종료 고착: 메뉴키·IME 전달키 제외
+
+회사 로컬 수정본 `AltTabFlow_1.1.11_갱신내용.md`를 기준으로 v1.1.15와 비교한 결과, 메뉴 키 `VK_APPS(0x5D)`나 IME `VK_PROCESSKEY(0xE5)`·`VK_PACKET(0xE7)`의 다운 상태가 OS에 남아 일반 Alt+Tab을 닫지 못하는 코드 경로가 아직 존재하여 **v1.1.16에서 통합 수정**했습니다.
+
+세 키는 기존대로 OS/다른 앱에 전달하고, 일반 Alt+Tab 해제 대기 집합에서만 제외합니다. 실제 키 Alt·Tab·방향키 등의 해제 조건과 명시적 Ctrl+Alt+Tab 고정은 보존합니다. 500ms `release-wait`는 세션당 1회 진단으로 **자동 종료하지 않습니다**. 회사 로컬 파일에 기록된 1.1.11 사용자 실사용 확인은 이 GitHub 릴리스 검증을 대체하지 않습니다.
+
+자동 Windows CI 기본 **314** + UI **106** + updater **22** + 관리자 **11** = **453개** 회귀 검사와 WinForms 화면 캡처를 포함합니다. 실제 회사 PC 특수 키·IME·메이플 게임 입력은 별도 실사용 확인이 필요합니다.
 
 ## 메이플스토리 전체화면(Alt+Enter)과 창 전환
 
