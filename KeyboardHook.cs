@@ -17,16 +17,22 @@ internal sealed class ShortcutRouter
     private int swallowedArrows;
     private long reconciledKeys;
     private long recoveredReleases;
+    private long auxiliaryKeyDowns;
     public ShortcutRouter(Action<SwitchCommand> post,Func<uint,bool>? keyIsDown=null) { this.post=post;this.keyIsDown=keyIsDown; }
     public bool IsActive=>session;
-    public object DiagnosticState()=>new{session,pinnedSession,heldKeys=heldKeys.Order().Select(k=>$"0x{k:X2}").ToArray(),knownDownCount=knownDown.Count,reconciledKeys,recoveredReleases};
+    public object DiagnosticState()=>new{session,pinnedSession,heldKeys=heldKeys.Order().Select(k=>$"0x{k:X2}").ToArray(),knownDownCount=knownDown.Count,reconciledKeys,recoveredReleases,auxiliaryKeyDowns};
+    // VK_APPS is a context-menu command; VK_PROCESSKEY/VK_PACKET transport
+    // IME and text. Their OS down state may outlive the originating command.
+    // Pass these events to their original applications, but never let their
+    // stale state prevent a regular Alt+Tab gesture from committing.
+    private static bool ReleaseParticipant(uint key)=>key is not (0x5D or 0xE5 or 0xE7);
     private bool IsCaptured(uint key)=>key==9&&swallowedTab||key==0xC0&&swallowedGrave||key==0x20&&swallowedSpace||key==0x7B&&swallowedPause||key==0x1B&&swallowedEscape||(key is >=0x25 and <=0x28)&&(swallowedArrows&(1<<((int)key-0x25)))!=0;
     // Called on the hook thread after callbacks, when Windows has updated async
     // state. Never infer release of intercepted keys from their async state.
     public void ReconcileReleased(bool alt,bool ctrl,bool shift){
         if(!session)return;
         if(keyIsDown!=null){
-            bool Stale(uint key)=>!IsCaptured(key)&&!keyIsDown(key);
+            bool Stale(uint key)=>!ReleaseParticipant(key)||!IsCaptured(key)&&!keyIsDown(key);
             reconciledKeys+=knownDown.RemoveWhere(Stale);heldKeys.RemoveWhere(Stale);
         }
         if(alt||ctrl||shift||heldKeys.Count!=0)return;
@@ -47,13 +53,15 @@ internal sealed class ShortcutRouter
         // a gesture. Captured keys can have no OS down-state: only their own up
         // event may release them. Never poll or sleep in the input callback.
         if(keyIsDown!=null){
-            bool Stale(uint k)=>k!=key&&!IsCaptured(k)&&!keyIsDown(k);
+            bool Stale(uint k)=>!ReleaseParticipant(k)||k!=key&&!IsCaptured(k)&&!keyIsDown(k);
             reconciledKeys+=knownDown.RemoveWhere(Stale);
             heldKeys.RemoveWhere(Stale);
         }
-        if(!isAlt&&!isCtrl&&!isShift){if(down)knownDown.Add(key);else knownDown.Remove(key);}
+        bool participates=ReleaseParticipant(key);
+        if(down&&!participates)auxiliaryKeyDowns++;
+        if(!isAlt&&!isCtrl&&!isShift){if(down&&participates)knownDown.Add(key);else knownDown.Remove(key);}
         if(!down)heldKeys.Remove(key);
-        else if(session&&!isAlt&&!isCtrl&&!isShift)heldKeys.Add(key);
+        else if(session&&!isAlt&&!isCtrl&&!isShift&&participates)heldKeys.Add(key);
         void FinishIfReleased(){
             if(session&&!altHeld&&!ctrlHeld&&!shiftHeld&&heldKeys.Count==0){session=false;bool commit=!pinnedSession;pinnedSession=false;if(commit)post(SwitchCommand.Commit);}
         }
@@ -99,6 +107,8 @@ internal sealed class KeyboardHook : IDisposable
     private uint threadId;
     private Exception? failure;
     private long eventCount, tabCount;
+    private long releaseWaitStarted;
+    private bool releaseWaitLogged;
     private bool lastTabAlt, lastTabCtrl, lastTabAltFlag,lastTabAltPhysical;
     private object routingState=new{session=false};
     public object Statistics => new {present=handle!=0,foregroundPresent=foregroundHook!=0,alive=thread.IsAlive,events=Interlocked.Read(ref eventCount),tabs=Interlocked.Read(ref tabCount),lastTabAlt,lastTabCtrl,lastTabAltFlag,lastTabAltPhysical,routing=Volatile.Read(ref routingState),physicalAlt=Native.GetAsyncKeyState(0x12)<0,physicalCtrl=Native.GetAsyncKeyState(0x11)<0,physicalShift=Native.GetAsyncKeyState(0x10)<0};
@@ -125,7 +135,15 @@ internal sealed class KeyboardHook : IDisposable
         try {
             while (Native.GetMessage(out var message, 0, 0, 0) > 0) {
                 if(message.Msg==0x113&&releaseTimer!=0&&message.WParam==releaseTimer){
-                    router.ReconcileReleased(Native.GetAsyncKeyState(0x12)<0,Native.GetAsyncKeyState(0x11)<0,Native.GetAsyncKeyState(0x10)<0);
+                    bool alt=Native.GetAsyncKeyState(0x12)<0,ctrl=Native.GetAsyncKeyState(0x11)<0,shift=Native.GetAsyncKeyState(0x10)<0;
+                    router.ReconcileReleased(alt,ctrl,shift);
+                    // 500ms is diagnostic only, never a forced dismissal.
+                    if(router.IsActive&&!alt&&!ctrl&&!shift){
+                        if(releaseWaitStarted==0)releaseWaitStarted=Environment.TickCount64;
+                        if(!releaseWaitLogged&&Environment.TickCount64-releaseWaitStarted>=500){
+                            releaseWaitLogged=true;AppLog.Write("release-wait",router.DiagnosticState());
+                        }
+                    } else {releaseWaitStarted=0;releaseWaitLogged=false;}
                     Volatile.Write(ref routingState,router.DiagnosticState());UpdateReleaseTimer();
                 }
             }
@@ -134,7 +152,10 @@ internal sealed class KeyboardHook : IDisposable
     }
     private void UpdateReleaseTimer(){
         if(router.IsActive&&releaseTimer==0)releaseTimer=Native.SetTimer(0,0,16,0);
-        else if(!router.IsActive&&releaseTimer!=0){Native.KillTimer(0,releaseTimer);releaseTimer=0;}
+        else if(!router.IsActive){
+            if(releaseTimer!=0){Native.KillTimer(0,releaseTimer);releaseTimer=0;}
+            releaseWaitStarted=0;releaseWaitLogged=false;
+        }
     }
     private nint Callback(int code, nint wp, nint lp) {
         if (code < 0) return Native.CallNextHookEx(handle, code, wp, lp);
