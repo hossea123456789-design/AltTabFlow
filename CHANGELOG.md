@@ -1,3 +1,12 @@
+## [1.1.16] - 2026-11-11
+
+### 회사 로컬 1.1.11 수정본: 일반 Alt+Tab 종료 대기 고착 방지
+- 사용자가 보고한 Ctrl 미입력 일반 Alt+Tab 창 잔류. 로컬 관찰: `pinnedSession=false`, `heldKeys=[0x5D]`, `physicalAlt/Shift=false`인데 `Commit` 부재. 기록 시점 UI는 이미 숨겨졌으나 라우터 세션이 살아 있던 상태. 메뉴 키 다운 발생 원인 앱/리매퍼는 확인되지 않음.
+- `ShortcutRouter.ReleaseParticipant`에서 메뉴키 VK_APPS(0x5D), IME 전송 VK_PROCESSKEY(0xE5), 텍스트 전송 VK_PACKET(0xE7)를 일반 전환 종료 대기용 `knownDown` 및 `heldKeys`에서 제외. 실제 키 이벤트는 가로채지 않고 OS/다른 앱에 전달, OS에 인위적 key-up을 보내지 않음.
+- Alt/Ctrl/Shift·Tab·방향키·Enter·일반 문자 및 가로챈 키의 실제 key-up 조건은 그대로 유지. 일반 키 전체 해제 한 번 Commit, Ctrl+Alt+Tab 명시적 고정, Excel/Chrome HWND 왕복 및 MRU 기본 정렬·옵션 보존.
+- 진단 `auxiliaryKeyDowns`, `switch-open`의 `pinned/persistent`, 보조키 미사용인데 500ms 이상 세션 해제 대기 시 한 번만 `release-wait` 기록(기록 조건이며 강제 종료 타이머 아님). 키 입력 전체를 기록하지 않음.
+- 신규 라우터/폼 연동 회귀 검사 28개. GitHub 자동 검사 목표: 기본 **314**, UI **106**, 업데이터 **22**, 관리자 자동 시작 **11** = **453개**. 회사 로컬 1.1.11 EXE/ZIP·실기기 확인과 GitHub 1.1.16 검증은 구분.
+
 ## [1.1.15] - 2026-11-11
 
 ### 회사 1.1.9·1.1.10 수정 명세 통합 (기존 1.1.14 위에 추가)

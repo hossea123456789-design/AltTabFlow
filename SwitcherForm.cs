@@ -205,7 +205,7 @@ internal sealed class SwitcherForm : Form
         finally{presenting=false;}
         if (pinned) search.Focus(); else ActiveControl = null;
         refreshUi.Start();Invalidate();catalog.RefreshSoon();
-        AppLog.Write("switch-open",new{origin=origin.ToInt64(),root=WindowIdentity.Root(origin).ToInt64(),originMaximized=Native.IsWindow(origin)&&Native.IsZoomed(origin),originTopmost=origin!=0&&((long)Native.GetWindowLongPtr(origin,-20)&8)!=0,selected=selected<entries.Count?entries[selected].Window.Handle.ToInt64():0});
+        AppLog.Write("switch-open",new{origin=origin.ToInt64(),root=WindowIdentity.Root(origin).ToInt64(),originMaximized=Native.IsWindow(origin)&&Native.IsZoomed(origin),originTopmost=origin!=0&&((long)Native.GetWindowLongPtr(origin,-20)&8)!=0,selected=selected<entries.Count?entries[selected].Window.Handle.ToInt64():0,pinned,persistent});
     }
     private void PrepareSwitcher(bool pinned,int direction,bool sameApp) {
         origin = Native.GetForegroundWindow(); monitor = Native.MonitorFromWindow(origin, 2);

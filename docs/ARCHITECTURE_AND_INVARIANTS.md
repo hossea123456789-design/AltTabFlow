@@ -1,5 +1,15 @@
 # 아키텍처 및 회귀 방지 불변 조건
 
+## 1.1.16 보조키·IME 입력에 따른 Alt+Tab 종료 게이트 불변 조건
+
+- `VK_APPS(0x5D)` / `VK_PROCESSKEY(0xE5)` / `VK_PACKET(0xE7)`는 창 전환 세션의 `heldKeys/knownDown`에 참여하지 않으며, OS 다운 상태가 영구 true여도 일반 Alt+Tab Commit을 붙잡지 않아야 함.
+- 해당 보조키의 콜백 `Route` 자체는 `false`를 반환해 원래 대상 앱에 이벤트를 전달. `SendInput` 등 강제 key-up이나 앱별 가로채기 금지.
+- Alt, Ctrl, Shift, 가로챈 Tab/방향키, Enter, 일반 문자 실제 홀드는 기존 방식: 마지막 관련 키를 놓거나 놓친 키 해제 재조정 시 단 한 번 Commit.
+- 고정 Ctrl+Alt+Tab은 키 해제 시 Commit 금지. Escape 취소, 메이플 Alt+Enter overlay, Excel 개별 HWND·MRU/이름순, 48명령/8ms UI 드레인 불변.
+- `release-wait`는 비수정키보드 보조키가 모두 해제되어 있는데 라우터 세션이 500ms 지속된 경우 세션당 최대 1회 진단만 남김. 자동 취소/강제 활성화 아님. 세션 종료시 타이머/진단 상태 해제.
+
+
+
 ## 1.1.15 Excel·Chrome 개별 HWND MRU / 정렬 불변 계약
 
 - 첫 일반 Alt+Tab은 이전 앱 그룹이 아니라 **직전 실제 별도 최상위 HWND**를 선택. 동일 owner/root 또는 동일 popup 체인만 현재 창으로 제외. Excel A/B 및 Chrome A/B는 각각 전환 후보.

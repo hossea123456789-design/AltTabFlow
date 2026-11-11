@@ -1,5 +1,16 @@
 # AltTabFlow — 후속 세션 인계 / START HERE
 
+## 1.1.16 회사 1.1.11 수정 내용 비교·통합 — 2026-11-11
+
+- 업로드 `AltTabFlow_1.1.11_갱신내용.md`와 GitHub main v1.1.15 비교 결과 `KeyboardHook.cs`의 `knownDown/heldKeys`에 메뉴 VK_APPS=0x5D와 IME 전송 0xE5/0xE7가 들어가 세션이 고착될 위험 확인. 회사 수정본 명세의 진단에 따르면 `pinnedSession=false`, `heldKeys=[0x5D]`, Alt/Ctrl 실물 키 꺼짐, Commit 없음. 원인 앱/장치/리매퍼 특정 안 됨.
+- `ReleaseParticipant` 제외 키 3개만 입력 종료 게이트에서 제거하고 물리 key-up을 강제로 보내지 않음. 잔여 키/고정 Ctrl+Alt+Tab/게임/Excel MRU/정렬 기존 불변 조건 유지.
+- `auxiliaryKeyDowns`, `switch-open pinned/persistent`, 500ms 이상 대기 `release-wait` 1회 진단 추가. 500ms는 시간초과에 의한 강제 전환이 아님. 진단 내용은 전체 타이핑 기록 아님.
+- 새 라우터 22개 + 목록/카드/아이콘 폼 6개를 추가해 기본 검사 **286→314**; 기존 UI106+업데이터22+관리자11 유지, 자동 총 **453개**. Windows CI/실제 PC 검증을 분리.
+- 이전 회사 로컬 ZIP/EXE의 SHA256은 새 GitHub 빌드에 적용되지 않음. GitHub 최신 v1.1.16 PR CI 성공, main 동일 SHA CI 성공, 공개 릴리스 파일+SHA256 확인 후 배포 완료 표기.
+- 사용자 회사 PC에서 보고된 '이제 둘 다 바로 닫힘'은 로컬 회사 v1.1.11의 확인이지 이 GitHub v1.1.16의 물리 키 검증이 아님.
+
+
+
 ## 1.1.15 회사 수정본 통합 — 2026-11-11
 
 - 사용자 업로드 `AltTabFlow_1.1.9_갱신내용.md`, `AltTabFlow_1.1.10_갱신내용.md` 순서 통합. 업로드 파일은 공개 GitHub로 원문 업로드하지 않음. 이전 1.1.9/1.1.10이라는 버전 번호는 회사 로컬 기준이므로 GitHub 최신 버전은 **1.1.15**로 증가.
