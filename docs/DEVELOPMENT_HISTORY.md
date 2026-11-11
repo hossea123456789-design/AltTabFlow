@@ -1,3 +1,10 @@
+## 1.1.15 · 회사 파일 1.1.9/1.1.10 수정 병합 (2026-11-11)
+
+- 사용자 첨부 `AltTabFlow_1.1.9_갱신내용.md` 및 `AltTabFlow_1.1.10_갱신내용.md`를 기존 공개 1.1.14 소스와 비교 후 통합. 회사 로컬 1.1.9/1.1.10 소스는 GitHub 기존 같은 번호의 변경과 다른 기능임.
+- `WindowCatalog.InitialSelection`은 그룹 인덱스 대신 실제 최상위 HWND 후보로 판단. `Entry.SelectWindow`로 선택 대표 분리·그룹/갱신/Backspace 생존.
+- MRU 기본 순서, 독립 SortAlphabetically/PrioritizePinned(둘 다 false 기본), 등록 앱 우선 토글 UI, Ctrl+P/우클릭 우선 표시, 새 ZIP 임시 잠금 3회 재시도 구현.
+- 기존 메이플 전체화면/빠른 연타/업데이터/관리자 자동 시작 보존. 신규 기본 +78, UI +7(총 284/106), Focus 추가 12 물리 창 검증. 사용자 회사 테스트 통과 사실과 이 GitHub 최신 브랜치의 CI 결과는 별도로 취급.
+
 ## 1.1.14 · 빠른 Alt+Tab 연타 시 UI 지연·이후 입력 먹통 방지 (2026-11-11)
 
 - 사용자 보고: Alt+Tab을 빠르게 여러 번 반복하면 선택 UI가 남았다가 뒤늦게 닫히고 그 후 Alt+Tab이 먹통처럼 동작.
