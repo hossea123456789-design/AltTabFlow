@@ -28,8 +28,10 @@ internal static class PeekTests
         var work=(Screen.PrimaryScreen??Screen.AllScreens[0]).WorkingArea;
         using var target=new FocusWindow{Text="AltTabFlow 전환 회귀 검사",Bounds=new Rectangle(work.Left+35,work.Top+40,400,220),BusySignal=report+".busy"};
         using var popup=new FocusWindow{Text="AltTabFlow 소유 팝업 검사",Bounds=new Rectangle(work.Left+455,work.Top+40,250,180),TopMost=true,Owner=target};
-        target.Show();popup.Show();
-        File.WriteAllText(report,JsonSerializer.Serialize(new{target=target.Handle.ToInt64(),popup=popup.Handle.ToInt64()}));
+        using var workbookA=new FocusWindow{Text="AltTabFlow 문서 A",Bounds=new Rectangle(work.Left+40,work.Top+300,350,180)};
+        using var workbookB=new FocusWindow{Text="AltTabFlow 문서 B",Bounds=new Rectangle(work.Left+410,work.Top+300,350,180)};
+        target.Show();popup.Show();workbookA.Show();workbookB.Show();
+        File.WriteAllText(report,JsonSerializer.Serialize(new{target=target.Handle.ToInt64(),popup=popup.Handle.ToInt64(),workbookA=workbookA.Handle.ToInt64(),workbookB=workbookB.Handle.ToInt64()}));
         using var timeout=new System.Windows.Forms.Timer{Interval=120000};timeout.Tick+=(_,_)=>Application.ExitThread();timeout.Start();Application.Run();
     }
     public static void RunFixture(string report){
@@ -129,6 +131,65 @@ internal static class PeekTests
                     result.Add(new{name="busy-target activation request ms",value=requestMs});
                     result.Add(new{name="busy-target confirmed switch ms",value=latency.Elapsed.TotalMilliseconds});
                 } finally {switcher.Shutdown();}
+                // Dedicated foreign-process window pair: each test mode keeps
+                // both distinct HWNDs while grouping by the same process.
+                nint workbookA=(nint)data.RootElement.GetProperty("workbookA").GetInt64(),
+                     workbookB=(nint)data.RootElement.GetProperty("workbookB").GetInt64();
+                wait.Restart();
+                while((!catalog.Snapshot.Any(w=>w.Handle==workbookA)||
+                       !catalog.Snapshot.Any(w=>w.Handle==workbookB))&&
+                       wait.ElapsedMilliseconds<2500){Application.DoEvents();Thread.Sleep(10);}
+                foreach(string mode in new[]{"목록","카드","아이콘"}){
+                    using var fixtureActivation=new WindowActivation();
+                    var grouped=new SwitcherForm(new Preferences{
+                        View=mode,GroupApps=true,PeekTarget=false,
+                        EmphasizeTarget=false,HighlightTarget=false
+                    },catalog){InspectionMode=true};
+                    bool ActivateFixture(nint hwnd){
+                        fixtureActivation.Request(hwnd);
+                        var timeout=Stopwatch.StartNew();
+                        while(Native.GetForegroundWindow()!=hwnd&&timeout.ElapsedMilliseconds<1500){
+                            Application.DoEvents();Thread.Sleep(5);
+                        }
+                        fixtureActivation.Cancel();
+                        if(Native.GetForegroundWindow()!=hwnd)return false;
+                        grouped.TrackForeground(hwnd);return true;
+                    }
+                    void WaitForCommit(){
+                        var timeout=Stopwatch.StartNew();
+                        while(grouped.IsCommitting&&timeout.ElapsedMilliseconds<800){
+                            Application.DoEvents();Thread.Sleep(5);
+                        }
+                    }
+                    try{
+                        bool ready=ActivateFixture(workbookB)&&ActivateFixture(workbookA);
+                        grouped.OpenSwitcher(false);
+                        var presented=Stopwatch.StartNew();
+                        while(Native.GetForegroundWindow()!=grouped.Handle&&presented.ElapsedMilliseconds<1000){
+                            Application.DoEvents();Thread.Sleep(5);
+                        }
+                        Check(mode+" 같은 프로세스 A에서 첫 선택은 실제 B HWND",
+                            ready&&Native.GetForegroundWindow()==grouped.Handle&&
+                            grouped.NavigationState.Selected==workbookB&&grouped.NavigationState.Group==null);
+                        grouped.NavigationReleased();WaitForCommit();
+                        environment.Add(new{phase="same-app-release",mode,expected=workbookB.ToInt64(),
+                            foreground=Native.GetForegroundWindow().ToInt64(),state=grouped.NavigationState.ToString()});
+                        Check(mode+" 같은 프로세스 B 활성화 확인 후 선택 화면 닫힘",
+                            Native.GetForegroundWindow()==workbookB&&!grouped.Visible&&!grouped.IsCommitting);
+                        grouped.QuickSwitch(new[]{new ShortcutInput(SwitchCommand.Next,0),new ShortcutInput(SwitchCommand.Commit,0)});WaitForCommit();
+                        environment.Add(new{phase="same-app-quick-back",mode,expected=workbookA.ToInt64(),
+                            foreground=Native.GetForegroundWindow().ToInt64(),
+                            selected=grouped.NavigationState.Selected.ToInt64(),grouped.Visible,grouped.IsCommitting});
+                        Check(mode+" UI 생략 빠른 경로에서 B에서 A로 왕복",
+                            Native.GetForegroundWindow()==workbookA&&!grouped.Visible&&!grouped.IsCommitting);
+                        grouped.QuickSwitch(new[]{new ShortcutInput(SwitchCommand.Next,0),new ShortcutInput(SwitchCommand.Commit,0)});WaitForCommit();
+                        environment.Add(new{phase="same-app-quick-forward",mode,expected=workbookB.ToInt64(),
+                            foreground=Native.GetForegroundWindow().ToInt64(),
+                            selected=grouped.NavigationState.Selected.ToInt64(),grouped.Visible,grouped.IsCommitting});
+                        Check(mode+" 빠른 경로 반복 시 A에서 B로 다시 왕복",
+                            Native.GetForegroundWindow()==workbookB&&!grouped.Visible&&!grouped.IsCommitting);
+                    } finally{grouped.Shutdown();}
+                }
             } catch(Exception ex){failures++;result.Add(new{name="별도 프로세스 전환 회귀 예외",passed=false,error=ex.ToString()});}
             finally{if(!fixture.HasExited)fixture.Kill();fixture.WaitForExit();if(File.Exists(focusReport))File.Delete(focusReport);if(File.Exists(focusReport+".busy"))File.Delete(focusReport+".busy");}
         }
