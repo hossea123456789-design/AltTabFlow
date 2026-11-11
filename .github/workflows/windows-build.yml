@@ -38,7 +38,7 @@ jobs:
           dotnet publish .\AltTabFlow.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=true -p:EnableCompressionInSingleFile=false -p:DebugType=None -p:DebugSymbols=false --output .\artifacts\ci-publish
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Test-Path '.\artifacts\ci-publish\AltTabFlow.exe')) { throw 'Missing candidate executable' }
-      - name: Validate missed-keyup recovery and input self-tests (284 cases)
+      - name: Validate missed-keyup recovery and input self-tests (286 cases)
         shell: pwsh
         run: |
           $exe = Join-Path (Get-Location) 'artifacts\ci-publish\AltTabFlow.exe'
@@ -48,7 +48,7 @@ jobs:
           $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
           $count = @($report.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
           Write-Host "Basic self tests: $count passed; failures=$($report.failures)"
-          if ($check.ExitCode -ne 0 -or $report.failures -ne 0 -or $count -ne 284) { throw 'Navigation self-test did not pass 284/284' }
+          if ($check.ExitCode -ne 0 -or $report.failures -ne 0 -or $count -ne 286) { throw 'Navigation self-test did not pass 286/286' }
           New-Item -ItemType Directory -Force -Path 'artifacts\ci-tests' | Out-Null
           Copy-Item -LiteralPath $reportPath -Destination 'artifacts\ci-tests\self-test.json'
       - name: Upload basic navigation test report
