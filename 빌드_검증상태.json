@@ -1,5 +1,5 @@
 {
-  "version": "1.1.15",
+  "version": "1.1.16",
   "patchBase": "1.1.9",
   "changedSourceFiles": 9,
   "sourceFiles": 29,
@@ -19,14 +19,14 @@
     "overlap": 10,
     "unique": 302
   },
-  "sourceReportedUserCheck": "Normal Alt+Tab repeated 2-3 times and Ctrl+Alt+Tab both reported normal after patch (not independently re-run in this session)",
+  "sourceReportedUserCheck": "Company local 1.1.11: normal and Ctrl-fixed Alt+Tab reported immediately closing correctly; not independently re-run on GitHub 1.1.16",
   "sourceReportedSettingsSha256Unchanged": true,
   "referenceZipSha256": "7BC446AC0BB43F26EE3E2354DBDC023F34AAC8027C2BBF07C327FFC43CA5650C",
   "referenceExeSha256": "6ABD2FA306B0106F3D1ED6296A0E0276CD5BE039380CD761D9C0C856F0021F0C",
   "githubActualScreenshots": "PASS main/settings/updater (CI #42842347985)",
   "mainMergeCommit": null,
   "githubBuiltExeSha256": "8c376e3f0db38e2cdfd2afaac9b9882d8ceecff1d3f2a0d747834407d9c8b658",
-  "baseVersion": "1.1.14",
+  "baseVersion": "1.1.15",
   "githubUpdater11": "PASS (11/11, CI 42832500112)",
   "elevatedGamePhysicalTest": "NOT_RUN",
   "fullUpdaterEndToEnd": "NOT_RUN",
@@ -51,11 +51,11 @@
   "publicUpdaterEndToEnd": "NOT_RUN",
   "exclusiveFullscreenGuaranteed": false,
   "publisherWorkflowRun": 42850768898,
-  "githubMainCI": 42850336840,
+  "githubMainCI": "PENDING v1.1.16",
   "publicZipSha256": "54c7755a7d40c9fa4f95ba31bfb7b2b1a39e2906843c2156a7062f936cf97ea4",
   "publicZipBytes": 70529517,
   "githubUi96": "PASS (96/96 PR #11 CI 42855755651)",
-  "githubRelease": "PENDING v1.1.15",
+  "githubRelease": "PENDING v1.1.16",
   "userReportedGamePreviewFocusBug": "MapleStory row selected after Alt+Enter briefly hides chooser for 1-2 AltTabs",
   "userReportedPreviewTextOverlap": "MapleStory window title overlaps redundant preview footer label",
   "githubUi99": "PENDING 1.1.14 PR Windows CI",
@@ -63,10 +63,18 @@
   "rapidInputQueueFix": "BOUNDED_FIFO_DRAIN 48 events/8ms, finally reschedule, deduplicate foreground activation",
   "sourceRequirements": [
     "AltTabFlow 1.1.9 user upload: same-process HWND MRU",
-    "AltTabFlow 1.1.10 user upload: MRU default and independent sort options"
+    "AltTabFlow 1.1.10 user upload: MRU default and independent sort options",
+    "AltTabFlow 1.1.11 user upload: VK_APPS/PROCESSKEY/PACKET release gate exclusion"
   ],
   "githubBasic284": "PENDING branch CI",
   "githubUi106": "PENDING branch CI",
   "sameAppFocus12": "IMPLEMENTED; NOT TESTED WITH ACTUAL EXCEL ON USER PC",
-  "physicalExcelTest": "NOT RUN on user's current Windows PC"
+  "physicalExcelTest": "NOT RUN on user's current Windows PC",
+  "companyLocalSourceVersion": "1.1.11",
+  "localSourceReport": "Ctrl=false, pinnedSession=false, heldKeys=[0x5D] caused missing Commit; original menu key origin unknown",
+  "githubBasic314": "PENDING branch CI",
+  "newUnitTests": 28,
+  "expectedAutomatedUniqueTests": 453,
+  "physicalKeyboardAuxiliaryTest": "NOT RUN on user's local/company PC with GitHub 1.1.16",
+  "githubReleaseVersionSha256": "PENDING"
 }
