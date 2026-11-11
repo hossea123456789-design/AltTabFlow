@@ -406,7 +406,7 @@ internal sealed class SwitcherForm : Form
     }
     private void TogglePin() {
         if (selected >= entries.Count) return; string key=entries[selected].Window.ProcessName;
-        int index=prefs.Pinned.FindIndex(x=>x.Equals(key,StringComparison.OrdinalIgnoreCase)); if(index>=0)prefs.Pinned.RemoveAt(index);else prefs.Pinned.Add(key); SavePreferences(); Rebuild(true);
+        int index=prefs.Pinned.FindIndex(x=>x.Equals(key,StringComparison.OrdinalIgnoreCase)); if(index>=0)prefs.Pinned.RemoveAt(index);else {prefs.Pinned.Add(key);prefs.PrioritizePinned=true;} SavePreferences(); Rebuild(true);
     }
     private ContextMenuStrip ShowItemMenu(int index, Point point) {
         if(itemMenu.Visible)itemMenu.Close();
@@ -488,7 +488,7 @@ internal sealed class SwitcherForm : Form
         if(group!=null) {
             Button(g,"‹ 전체 앱",R(28,194,95,26),GoBack,false,"Backspace · 앱 목록으로 돌아가기",true);
             Txt(g,snapshot.FirstOrDefault(w=>w.GroupKey==group)?.AppName??"앱의 창",R(137,197,W-300,24),13,Accent,true);
-        } else Txt(g,search.Text.Length>0?"검색 결과 · 제목을 확인하고 바로 전환하세요":prefs.Pinned.Count>0?"상단 등록 앱 먼저 · 각 그룹 A~Z → 가나다순":"앱 이름순 · A~Z → 가나다 · Enter로 묶음 펼치기",R(28,199,W-56,24),12,Muted);
+        } else Txt(g,search.Text.Length>0?"검색 결과 · 제목을 확인하고 바로 전환하세요":(prefs.PrioritizePinned&&prefs.Pinned.Count>0?"상단 등록 앱 먼저 · ":"")+(prefs.SortAlphabetically?"앱 이름순 · A~Z → 가나다":"최근 사용한 창 순서")+" · Enter로 묶음 펼치기",R(28,199,W-56,24),12,Muted);
         if(entries.Count==0) {
             Txt(g,catalog.Snapshot.Length==0?"열린 창을 준비하고 있습니다":"일치하는 창이 없습니다",R(60,320,W-120,40),22,Ink,true,false,TextFormatFlags.HorizontalCenter);
             Txt(g,"검색어를 줄이거나 설정에서 숨긴 앱을 확인해 주세요.",R(60,367,W-120,30),14,Muted,false,false,TextFormatFlags.HorizontalCenter);
@@ -603,7 +603,7 @@ internal sealed class SwitcherForm : Form
         } finally { configuring=false; ShortcutSuppression?.Invoke(false); if(Visible) { Activate(); UpdateAura(); Invalidate(); } }
     }
     public object DiagnosticState() => new {
-        visible=Visible, nativeVisible=Native.IsWindowVisible(Handle), ownHwnd=Handle.ToInt64(), foreground=Native.GetForegroundWindow().ToInt64(),origin=origin.ToInt64(),committing, prefs.View, prefs.GroupApps, persistent, selected, page, pageSize,
+        visible=Visible, nativeVisible=Native.IsWindowVisible(Handle), ownHwnd=Handle.ToInt64(), foreground=Native.GetForegroundWindow().ToInt64(),origin=origin.ToInt64(),committing, prefs.View, prefs.GroupApps, prefs.SortAlphabetically, prefs.PrioritizePinned, persistent, selected, page, pageSize,
         query=search.Text, group, selectedHwnd=selected<entries.Count?entries[selected].Window.Handle.ToInt64():0,
         totalWindows=snapshot.Count, totalEntries=entries.Count, thumbnails=thumbnails.Count,
         lastPaintMs, samples=paintSamples.ToArray(), refreshMs=catalog.LastRefreshMs,
