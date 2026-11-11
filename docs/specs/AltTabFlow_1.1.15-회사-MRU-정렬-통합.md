@@ -20,6 +20,6 @@
 - 한 제스처 동안 목록 순서 고정, 재진입 시 새 MRU 반영. 기존 게임/빠른 연타/업데이터/UAC 유지.
 
 ## 검증
-- Windows CI 기대 기본284 + UI106 + updater22 + startup11 = 423.
+- Windows CI 기대 기본286 + UI106 + updater22 + startup11 = 425.
 - 별도 `--focus-self-test` 기존18 + 신규12 = 예상30. 실제 Microsoft Excel 물리 전환은 사용자 PC 수동 검증.
 - 출처 문서의 회사 빌드 SHA-256은 회사 로컬 1.1.9/1.1.10 파일에만 적용되며 이 통합 1.1.15 해시로 재사용하지 않음.
