@@ -2,7 +2,7 @@
 
 ## 1.1.15 회사 1.1.9·1.1.10 동시 반영 검증
 
-- [ ] Windows CI `--self-test` **284/284** (기존206 + Excel HWND/MRU 40 + 정렬38), `--ui-self-test` **106/106** (기존99 + 정렬 저장/취소7), updater22/22, startup11/11 = **423/423**.
+- [ ] Windows CI `--self-test` **286/284** (기존206 + Excel HWND/MRU 40 + 정렬38 + 독립 HWND 불변조건 추가2), `--ui-self-test` **106/106** (기존99 + 정렬 저장/취소7), updater22/22, startup11/11 = **425/423**.
 - [ ] 묶기 켬/끔 Excel A↔B, Excel만 열린 경우, Excel B 대신 Chrome이 직전인 경우, 역방향, Ctrl+Alt+Tab 고정, owner/popup 제외, 동일 앱 Chrome 다중 창.
 - [ ] 그룹 제목·미리보기·FX·실제 Commit 대상이 모두 같은 HWND; Rebuild(true)·그룹 Enter/Backspace·닫힌 문서/검색/숨김/모니터 필터.
 - [ ] 정렬 4조합: MRU+등록 우선 OFF(기본), 이름순만, 등록 우선만, 둘 다. 이전 settings.json 두 새 속성 누락 시 false 기본·등록/숨김/테마 보존. 체크만 바꾼 취소와 저장 동작.
