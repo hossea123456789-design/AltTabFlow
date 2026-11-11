@@ -1,13 +1,23 @@
-# 테스트·배포 매트릭스 (v1.1.15)
+# 테스트·배포 매트릭스 (v1.1.16)
+
+## 1.1.16 보조키 down 상태 일반 Alt+Tab 잔류 검증
+
+- [ ] Windows CI 기본 `--self-test` **314/314**: 이전286 + 라우터22(0x5D/0xE5/0xE7 × 제스처 전·중 × 다운/패스스루/늦은 up 18, Alt-up 놓침 복구 1, 고정1, 방향키 실제 홀드2) + 실제 폼6(목록·카드·아이콘 각각 일반 완료·고정 유지).
+- [ ] `--ui-self-test` 106/106, `--updater-self-test`22/22, `--startup-self-test`11/11, 자동검사 합계 **453/453**. 독립 프로세스 focus/Peek/메뉴/실사용 Windows PC 테스트는 별도.
+- [ ] 0x5D/0xE5/0xE7의 OS down 잔류가 Commit 방해하지 않음, 키 이벤트 미소비, key-up 지연에도 중복 Commit 없음. 실제 키·Ctrl·Shift·Alt 해제 조건 유지. CtrlAltTab은 계속 고정. ESC, Excel HWND, MRU/이름순 및 메이플 Alt+Enter 회귀 유지.
+- [ ] `release-wait`: Alt/Ctrl/Shift 모두 false인데 실제 세션 500ms 이상 대기시에만 1회 기록; 시간초과로 강제 종료하지 않음. 세션 종료시 로깅 상태 및 WM_TIMER 정리, 입력 전문 저장하지 않음.
+- [ ] 회사 기존 1.1.11 실사용 확인 ≠ GitHub 1.1.16 실사용 확인. 회사 ZIP·EXE 해시는 현재 릴리스의 검증 근거로 재사용 금지.
+
+
 
 ## 1.1.15 회사 1.1.9·1.1.10 동시 반영 검증
 
-- [ ] Windows CI `--self-test` **286/284** (기존206 + Excel HWND/MRU 40 + 정렬38 + 독립 HWND 불변조건 추가2), `--ui-self-test` **106/106** (기존99 + 정렬 저장/취소7), updater22/22, startup11/11 = **425/423**.
+- [ ] Windows CI `--self-test` **286/286** (기존206 + Excel HWND/MRU 40 + 정렬38 + 독립 HWND 불변조건 추가2), `--ui-self-test` **106/106** (기존99 + 정렬 저장/취소7), updater22/22, startup11/11 = **425/425**.
 - [ ] 묶기 켬/끔 Excel A↔B, Excel만 열린 경우, Excel B 대신 Chrome이 직전인 경우, 역방향, Ctrl+Alt+Tab 고정, owner/popup 제외, 동일 앱 Chrome 다중 창.
 - [ ] 그룹 제목·미리보기·FX·실제 Commit 대상이 모두 같은 HWND; Rebuild(true)·그룹 Enter/Backspace·닫힌 문서/검색/숨김/모니터 필터.
 - [ ] 정렬 4조합: MRU+등록 우선 OFF(기본), 이름순만, 등록 우선만, 둘 다. 이전 settings.json 두 새 속성 누락 시 false 기본·등록/숨김/테마 보존. 체크만 바꾼 취소와 저장 동작.
 - [ ] 최근 사용 순은 실제 foreground 활성화 기준, 그룹 위치는 가장 최근 멤버 순위, 한 제스처 동안 카탈로그 갱신으로 순서 흔들림 없음.
-- [ ] `--focus-self-test`에서 별도 프로세스의 독립 창 A/B를 이용한 추가 **12개** 실전 HWND 활성화·QuickSwitch 왕복 테스트(기존 18 → 30 예상). 자동 Windows CI 기본 423건과 별도.
+- [ ] `--focus-self-test`에서 별도 프로세스의 독립 창 A/B를 이용한 추가 **12개** 실전 HWND 활성화·QuickSwitch 왕복 테스트(기존 18 → 30 예상). 자동 Windows CI 기본 425건과 별도.
 - [ ] `package.ps1` 기존 버전 압축본 불변, 충돌 시 새 미완성 ZIP만 제거 후 최대 3회 재시도. 사용자 설정 SHA256 무손실.
 - [ ] 사용자 Windows 실제 Excel 2문서, Chrome 2창 물리 Alt+Tab, MapleStory Alt+Enter 빠른 연타, UAC/업데이트 교체 종단 간 검사 별도.
 
