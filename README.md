@@ -2,7 +2,7 @@
 
 **세션 간 후속 작업 시작점: [PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md)** · [전체 개발 이력](docs/DEVELOPMENT_HISTORY.md) · [동작 불변 조건](docs/ARCHITECTURE_AND_INVARIANTS.md) · [검증 매트릭스](docs/TEST_MATRIX.md)
 
-Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.14**입니다.
+Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.15**입니다.
 
 > **업데이트/배포:** 기존 저장소 `hossea123456789-design/AltTabFlow` 자체가 Public인 경우 같은 저장소의 공개 Releases에서 익명으로 버전과 SHA-256을 확인하고 앱 버튼으로 교체합니다. 별도의 `AltTabFlow-Downloads` 저장소나 배포 PAT는 불필요합니다. **저장소 Public 및 [v1.1.12 공개 릴리스 게시 완료](https://github.com/hossea123456789-design/AltTabFlow/releases/tag/v1.1.12).**
 
@@ -19,6 +19,14 @@ Alt+Enter로 확장된 메이플스토리가 최대화 또는 전체화면 상�
 설정 → 업데이트 확인으로 **같은 공개 GitHub 저장소**의 Releases에서 새로운 Windows EXE를 받습니다. 사용자 GitHub 로그인/PAT는 요구하지 않습니다. 자동 배포는 성공한 Windows CI와 같은 `main` SHA의 실행 파일만 사용하고, `GITHUB_TOKEN`으로 공개 프리릴리스를 생성합니다. 앱은 업로드된 ZIP의 SHA-256과 EXE 버전을 검증하고 재시작합니다.
 
 **최초 공개 전환 절차(현재 완료):** GitHub 관리 권한 보유자가 저장소 Settings → General → Danger Zone → Change repository visibility → Public을 한 번 승인해야 합니다. 자동 배포 워크플로는 Private 상태에서 릴리스를 만들지 않으며, Public으로 전환하면 GitHub의 `public` 이벤트가 배포 작업을 자동 실행합니다. 별도 Actions 수동 실행은 필요하지 않습니다. 저장소 공개는 과거 커밋·이슈·로그까지 공개될 수 있어 사전 점검이 필요합니다.
+
+## 1.1.15: 같은 앱 문서 왕복 + 기본 최근 사용 순 정렬
+
+회사 수정 문서 `AltTabFlow_1.1.9_갱신내용.md`와 `AltTabFlow_1.1.10_갱신내용.md`의 **기능을 순서대로 통합**한 버전입니다. Excel A·B처럼 하나의 EXCEL.EXE에서 열린 별도 최상위 창도 직전 창으로 선택합니다. Chrome에도 동일하며, 앱 그룹을 Enter로 펼치거나 Backspace로 복귀해도 실제 선택 HWND를 유지합니다.
+
+기본 목록 순서는 **가장 최근에 활성화된 창 순서(MRU)**입니다. 설정 → 정렬의 `앱 이름순 정렬`과 `등록한 앱 먼저 표시`는 각각 독립 체크박스이며 기본값은 둘 다 꺼짐입니다. 이전 등록 앱/숨김/테마 설정은 보존됩니다. 새 앱을 Ctrl+P·우클릭으로 상단 등록하면 우선 표시가 켜집니다.
+
+기존 1.1.13 메이플 전체화면 가려짐·미리보기 겹침 수정, 1.1.14 빠른 연타 큐 안정성 수정은 유지합니다. Windows CI 자동 입력286/UI106/업데이터22/관리자11 **총 425건** 검사 목표이며, 실제 Excel·메이플 전체화면 키 입력은 별도 확인 대상입니다.
 
 ## 1.1.14: 빠른 Alt+Tab 연속 입력 안정성
 

@@ -1,4 +1,17 @@
-# 테스트·배포 매트릭스 (v1.1.14)
+# 테스트·배포 매트릭스 (v1.1.15)
+
+## 1.1.15 회사 1.1.9·1.1.10 동시 반영 검증
+
+- [ ] Windows CI `--self-test` **286/284** (기존206 + Excel HWND/MRU 40 + 정렬38 + 독립 HWND 불변조건 추가2), `--ui-self-test` **106/106** (기존99 + 정렬 저장/취소7), updater22/22, startup11/11 = **425/423**.
+- [ ] 묶기 켬/끔 Excel A↔B, Excel만 열린 경우, Excel B 대신 Chrome이 직전인 경우, 역방향, Ctrl+Alt+Tab 고정, owner/popup 제외, 동일 앱 Chrome 다중 창.
+- [ ] 그룹 제목·미리보기·FX·실제 Commit 대상이 모두 같은 HWND; Rebuild(true)·그룹 Enter/Backspace·닫힌 문서/검색/숨김/모니터 필터.
+- [ ] 정렬 4조합: MRU+등록 우선 OFF(기본), 이름순만, 등록 우선만, 둘 다. 이전 settings.json 두 새 속성 누락 시 false 기본·등록/숨김/테마 보존. 체크만 바꾼 취소와 저장 동작.
+- [ ] 최근 사용 순은 실제 foreground 활성화 기준, 그룹 위치는 가장 최근 멤버 순위, 한 제스처 동안 카탈로그 갱신으로 순서 흔들림 없음.
+- [ ] `--focus-self-test`에서 별도 프로세스의 독립 창 A/B를 이용한 추가 **12개** 실전 HWND 활성화·QuickSwitch 왕복 테스트(기존 18 → 30 예상). 자동 Windows CI 기본 423건과 별도.
+- [ ] `package.ps1` 기존 버전 압축본 불변, 충돌 시 새 미완성 ZIP만 제거 후 최대 3회 재시도. 사용자 설정 SHA256 무손실.
+- [ ] 사용자 Windows 실제 Excel 2문서, Chrome 2창 물리 Alt+Tab, MapleStory Alt+Enter 빠른 연타, UAC/업데이트 교체 종단 간 검사 별도.
+
+
 
 ## v1.1.14 빠른 입력 회귀 검사
 

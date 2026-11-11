@@ -66,7 +66,19 @@ try {
     $info | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stage 'release-info.json') -Encoding UTF8
     $zipName="AltTabFlow-v$version-win-x64-$buildId.zip"
     $zip=Join-Path $releaseRoot $zipName
-    Compress-Archive -LiteralPath $stage -DestinationPath $zip -CompressionLevel Optimal
+    # Never overwrite a previously completed versioned release archive.
+    if(Test-Path -LiteralPath $zip){throw 'Refuse to overwrite immutable archive'}
+    for($archiveAttempt=0;$archiveAttempt -lt 3;$archiveAttempt++){
+        try {
+            Compress-Archive -LiteralPath $stage -DestinationPath $zip -CompressionLevel Optimal
+            break
+        } catch {
+            # Remove only the incomplete archive produced by this invocation.
+            if(Test-Path -LiteralPath $zip){Remove-Item -LiteralPath $zip -Force}
+            if($archiveAttempt -eq 2){throw}
+            Start-Sleep -Milliseconds 600
+        }
+    }
     Expand-Archive -LiteralPath $zip -DestinationPath $verifyRoot
     $extracted=Join-Path $verifyRoot 'AltTabFlow\AltTabFlow.exe'
     if((Get-FileHash -LiteralPath $extracted -Algorithm SHA256).Hash -ne $info.exeSha256){throw 'ZIP executable hash mismatch'}

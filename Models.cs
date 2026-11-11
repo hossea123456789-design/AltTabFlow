@@ -10,6 +10,9 @@ internal sealed class Preferences
 {
     public string View { get; set; } = "목록";
     public bool GroupApps { get; set; } = true;
+    // Added in 1.1.15: missing settings fields deserialize as false (MRU default).
+    public bool SortAlphabetically { get; set; }
+    public bool PrioritizePinned { get; set; }
     public bool ReplaceAltTab { get; set; } = true;
     public bool CurrentMonitorOnly { get; set; }
     public bool OnPrimaryMonitor { get; set; } = true;
@@ -61,7 +64,15 @@ internal sealed record WindowInfo(nint Handle, string Title, string ProcessName,
 internal sealed class Entry
 {
     public required List<WindowInfo> Windows { get; init; }
-    public WindowInfo Window => Windows[0];
+    private WindowInfo? selectedWindow;
+    // A group is only a presentation row. Switching, title, thumbnail and
+    // effects all use the selected real HWND, not always Windows[0].
+    public WindowInfo Window => selectedWindow ?? Windows[0];
+    public bool SelectWindow(nint handle) {
+        var found=Windows.Find(w=>w.Handle==handle);
+        if(found==null)return false;
+        selectedWindow=found;return true;
+    }
     public bool IsGroup => Windows.Count > 1;
 }
 
@@ -127,23 +138,44 @@ internal static class WindowCatalog
         var windows = source.Where(w => !p.Excluded.Contains(w.ProcessName, StringComparer.OrdinalIgnoreCase));
         if (p.CurrentMonitorOnly && monitor != 0) windows = windows.Where(w => Native.MonitorFromWindow(w.Handle, 2) == monitor);
         if (group != null) windows = windows.Where(w => w.GroupKey == group);
-        windows = windows.Where(w => Matches(w, query));
+        // Order is the frozen MRU rank for one gesture, not process startup order.
+        windows = windows.Where(w => Matches(w, query)).OrderBy(w => w.Order);
         List<Entry> entries;
         if (p.GroupApps && group == null && string.IsNullOrWhiteSpace(query))
             entries = windows.GroupBy(w => w.GroupKey).Select(g => new Entry { Windows = g.ToList() }).ToList();
         else entries = windows.Select(w => new Entry { Windows = new() { w } }).ToList();
         var pinned=p.Pinned.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return entries.OrderBy(e => pinned.Contains(e.Window.ProcessName)?0:1)
-            .ThenBy(e=>e.Window.AppName,AppNameComparer.Instance)
-            .ThenBy(e=>e.Window.GroupKey,StringComparer.OrdinalIgnoreCase)
-            .ThenBy(e => e.Window.Order).ToList();
+        var ordered=entries.OrderBy(e => p.PrioritizePinned&&pinned.Contains(e.Window.ProcessName)?0:1);
+        if(p.SortAlphabetically)ordered=ordered.ThenBy(e=>e.Window.AppName,AppNameComparer.Instance)
+            .ThenBy(e=>e.Window.GroupKey,StringComparer.OrdinalIgnoreCase);
+        // Use the newest member of a group, never the selected target; selecting
+        // another workbook must not shuffle the visible app groups.
+        return ordered.ThenBy(e => e.Windows[0].Order).ToList();
     }
     internal static int InitialSelection(IReadOnlyList<Entry> entries,IEnumerable<WindowInfo> recency,nint origin,bool pinned,int direction){
-        int current=-1;for(int i=0;i<entries.Count;i++)if(entries[i].Windows.Any(x=>WindowIdentity.Same(x.Handle,origin))){current=i;break;}
-        if(pinned||entries.Count<=1)return Math.Max(0,current);
-        var candidates=recency.Select(w=>{for(int i=0;i<entries.Count;i++)if(entries[i].Windows.Any(x=>x.Handle==w.Handle))return i;return -1;}).Where(i=>i>=0&&i!=current).Distinct().ToList();
-        if(candidates.Count==0)return Math.Max(0,current);
-        return direction<0?candidates[^1]:candidates[0];
+        int current=-1;
+        var byHandle=new Dictionary<nint,int>();
+        for(int i=0;i<entries.Count;i++)foreach(var window in entries[i].Windows) {
+            byHandle[window.Handle]=i;
+            if(current<0&&WindowIdentity.Same(window.Handle,origin)) {
+                current=i;
+                entries[i].SelectWindow(window.Handle);
+            }
+        }
+        // Pinned chooser deliberately starts at the actual foreground HWND.
+        if(pinned)return Math.Max(0,current);
+        int chosen=-1;
+        nint target=0;
+        foreach(var window in recency){
+            // Skip only the current physical HWND or its owner/popup chain,
+            // never the entire Excel/Chrome presentation group.
+            if(WindowIdentity.Same(window.Handle,origin)||!byHandle.TryGetValue(window.Handle,out int index))continue;
+            chosen=index;target=window.Handle;
+            if(direction>=0)break;
+        }
+        if(chosen<0)return Math.Max(0,current);
+        entries[chosen].SelectWindow(target);
+        return chosen;
     }
     public static Bitmap GetIcon(WindowInfo w) {
         if (Icons.TryGetValue(w.GroupKey, out var cached)) return cached;

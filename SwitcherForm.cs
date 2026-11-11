@@ -254,8 +254,17 @@ internal sealed class SwitcherForm : Form
     private void Rebuild(bool keep) {
         int beforeCount=entries.Count;
         nint prev = keep && selected < entries.Count ? entries[selected].Window.Handle : 0;
+        // Preserve the real selected document across title/catalog refresh,
+        // even when that grouped row is not the current highlighted row.
+        var representatives=keep?entries.Where(e=>e.IsGroup)
+            .ToDictionary(e=>e.Window.GroupKey,e=>e.Window.Handle):null;
         entries = WindowCatalog.Build(snapshot, prefs, search.Text, group, monitor);
-        if (prev != 0) { int index = entries.FindIndex(e => e.Windows.Any(w => w.Handle == prev)); if (index >= 0) selected = index; }
+        if(representatives!=null)foreach(var entry in entries)
+            if(representatives.TryGetValue(entry.Window.GroupKey,out var hwnd))entry.SelectWindow(hwnd);
+        if(prev!=0){
+            int index=entries.FindIndex(e=>e.SelectWindow(prev));
+            if(index>=0)selected=index;
+        }
         if(Visible&&beforeCount!=entries.Count&&search.TextLength==0)ApplyBounds();
         selected = Math.Clamp(selected, 0, Math.Max(0, entries.Count-1)); EnsurePage();
         UpdateAura();
@@ -332,13 +341,23 @@ internal sealed class SwitcherForm : Form
         InputTimestamp=releaseTimestamp=0;
     }
     private void ExpandGroup() {
-        if (selected >= entries.Count || !entries[selected].IsGroup) return;
-        group = entries[selected].Window.GroupKey; selected=page=0;
-        updating=true; search.Clear(); updating=false; Rebuild(false);
+        if(selected>=entries.Count||!entries[selected].IsGroup)return;
+        nint target=entries[selected].Window.Handle;
+        group=entries[selected].Window.GroupKey;selected=page=0;
+        updating=true;search.Clear();updating=false;Rebuild(false);
+        RestoreSelection(target);
     }
     private void GoBack() {
-        string? previous=group; group=null; selected=page=0; Rebuild(false);
-        int index=entries.FindIndex(x=>x.Window.GroupKey==previous); if(index>=0){selected=index;EnsurePage();UpdateAura();Invalidate();}
+        nint target=selected<entries.Count?entries[selected].Window.Handle:0;
+        string? previous=group;group=null;selected=page=0;Rebuild(false);
+        if(RestoreSelection(target))return;
+        int index=entries.FindIndex(x=>x.Window.GroupKey==previous);
+        if(index>=0){selected=index;EnsurePage();UpdateAura();Invalidate();}
+    }
+    private bool RestoreSelection(nint target) {
+        int index=entries.FindIndex(e=>e.SelectWindow(target));
+        if(index<0)return false;
+        selected=index;EnsurePage();UpdateAura();Invalidate();return true;
     }
     private void SetView(string mode) { persistent=true; prefs.View=mode; SavePreferences(); ClearThumbnails(); ApplyBounds(); EnsurePage(); Invalidate(); }
     public void DetailedNavigate(Keys key) {
@@ -387,7 +406,7 @@ internal sealed class SwitcherForm : Form
     }
     private void TogglePin() {
         if (selected >= entries.Count) return; string key=entries[selected].Window.ProcessName;
-        int index=prefs.Pinned.FindIndex(x=>x.Equals(key,StringComparison.OrdinalIgnoreCase)); if(index>=0)prefs.Pinned.RemoveAt(index);else prefs.Pinned.Add(key); SavePreferences(); Rebuild(true);
+        int index=prefs.Pinned.FindIndex(x=>x.Equals(key,StringComparison.OrdinalIgnoreCase)); if(index>=0)prefs.Pinned.RemoveAt(index);else {prefs.Pinned.Add(key);prefs.PrioritizePinned=true;} SavePreferences(); Rebuild(true);
     }
     private ContextMenuStrip ShowItemMenu(int index, Point point) {
         if(itemMenu.Visible)itemMenu.Close();
@@ -469,7 +488,7 @@ internal sealed class SwitcherForm : Form
         if(group!=null) {
             Button(g,"‹ 전체 앱",R(28,194,95,26),GoBack,false,"Backspace · 앱 목록으로 돌아가기",true);
             Txt(g,snapshot.FirstOrDefault(w=>w.GroupKey==group)?.AppName??"앱의 창",R(137,197,W-300,24),13,Accent,true);
-        } else Txt(g,search.Text.Length>0?"검색 결과 · 제목을 확인하고 바로 전환하세요":prefs.Pinned.Count>0?"상단 등록 앱 먼저 · 각 그룹 A~Z → 가나다순":"앱 이름순 · A~Z → 가나다 · Enter로 묶음 펼치기",R(28,199,W-56,24),12,Muted);
+        } else Txt(g,search.Text.Length>0?"검색 결과 · 제목을 확인하고 바로 전환하세요":(prefs.PrioritizePinned&&prefs.Pinned.Count>0?"상단 등록 앱 먼저 · ":"")+(prefs.SortAlphabetically?"앱 이름순 · A~Z → 가나다":"최근 사용한 창 순서")+" · Enter로 묶음 펼치기",R(28,199,W-56,24),12,Muted);
         if(entries.Count==0) {
             Txt(g,catalog.Snapshot.Length==0?"열린 창을 준비하고 있습니다":"일치하는 창이 없습니다",R(60,320,W-120,40),22,Ink,true,false,TextFormatFlags.HorizontalCenter);
             Txt(g,"검색어를 줄이거나 설정에서 숨긴 앱을 확인해 주세요.",R(60,367,W-120,30),14,Muted,false,false,TextFormatFlags.HorizontalCenter);
@@ -584,7 +603,7 @@ internal sealed class SwitcherForm : Form
         } finally { configuring=false; ShortcutSuppression?.Invoke(false); if(Visible) { Activate(); UpdateAura(); Invalidate(); } }
     }
     public object DiagnosticState() => new {
-        visible=Visible, nativeVisible=Native.IsWindowVisible(Handle), ownHwnd=Handle.ToInt64(), foreground=Native.GetForegroundWindow().ToInt64(),origin=origin.ToInt64(),committing, prefs.View, prefs.GroupApps, persistent, selected, page, pageSize,
+        visible=Visible, nativeVisible=Native.IsWindowVisible(Handle), ownHwnd=Handle.ToInt64(), foreground=Native.GetForegroundWindow().ToInt64(),origin=origin.ToInt64(),committing, prefs.View, prefs.GroupApps, prefs.SortAlphabetically, prefs.PrioritizePinned, persistent, selected, page, pageSize,
         query=search.Text, group, selectedHwnd=selected<entries.Count?entries[selected].Window.Handle.ToInt64():0,
         totalWindows=snapshot.Count, totalEntries=entries.Count, thumbnails=thumbnails.Count,
         lastPaintMs, samples=paintSamples.ToArray(), refreshMs=catalog.LastRefreshMs,
@@ -595,6 +614,10 @@ internal sealed class SwitcherForm : Form
     };
     // Exercise the real keyboard routing on an off-screen form without moving user windows.
     internal void PrepareNavigationTest(List<WindowInfo> windows,bool pinned=false){snapshot=windows;selected=page=0;group=null;persistent=pinned;Rebuild(false);ApplyBounds();}
+    internal void TestInitialSelection(nint current,bool pinned=false,int direction=1){
+        origin=current;persistent=pinned;selected=WindowCatalog.InitialSelection(entries,snapshot,current,pinned,direction);EnsurePage();
+    }
+    internal void TestRefresh(List<WindowInfo> windows){snapshot=windows;Rebuild(true);}
     internal bool TestKey(Keys key){var message=Message.Create(Handle,0x100,(nint)(int)key,0);return ProcessCmdKey(ref message,key);}
     internal void TestMouse(Point point,bool down){var e=new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0);if(down)OnMouseDown(e);else OnMouseUp(e);}
     internal void TestWheel(int delta)=>OnMouseWheel(new MouseEventArgs(MouseButtons.None,0,Width/2,Height/2,delta));

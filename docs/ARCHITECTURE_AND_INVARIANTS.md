@@ -1,5 +1,16 @@
 # 아키텍처 및 회귀 방지 불변 조건
 
+## 1.1.15 Excel·Chrome 개별 HWND MRU / 정렬 불변 계약
+
+- 첫 일반 Alt+Tab은 이전 앱 그룹이 아니라 **직전 실제 별도 최상위 HWND**를 선택. 동일 owner/root 또는 동일 popup 체인만 현재 창으로 제외. Excel A/B 및 Chrome A/B는 각각 전환 후보.
+- `Entry.Windows` 그룹 멤버십·정렬 순서는 불변. `Entry.Window`는 실제 선택 HWND이며 제목·DWM 썸네일·FX·Commit이 모두 같은 대상을 읽음. 그룹 내 다른 문서를 대표로 골라도 그룹의 표시 정렬은 `Windows[0].Order`로 유지.
+- `Rebuild(true)`는 살아 있는 선택 HWND와 최신 `WindowInfo`를 재연결하며 제목 변경/갱신 중 순서 유지. 닫힌 HWND는 선택되지 않음. Enter 그룹 확장과 Backspace 복귀는 개별 선택 보존.
+- 기본 정렬은 직전 foreground 이력(MRU): 창을 실제로 활성화한 순서. `SortAlphabetically`·`PrioritizePinned`는 각각 false로 시작하며 서로 독립. 조합 네 가지, 기존 JSON 설정/등록 앱·숨김 보존.
+- Ctrl+P 및 우클릭의 **신규 상단 등록**은 `PrioritizePinned`를 활성화하는 명시적 사용자 조작. 설정 체크만 변경한 경우 Save 전 반영되지 않음.
+- 1.1.13 메이플 Alt+Enter 보호, 1.1.14 48명령/8ms FIFO bounded drain, 전체 관련 키 해제 한 번 Commit과 고정 Ctrl+Alt+Tab 동작 유지.
+
+
+
 ## 1.1.14 빠른 Alt+Tab 큐 안정성 불변 조건
 
 - 키보드 훅 스레드 명령은 FIFO를 보존하고, WinForms UI 드레인은 한 메시지에서 최대 48명령 또는 8ms까지만 처리한 뒤 Paint/WM_TIMER/Commit 확인에 메시지 처리 기회를 주어야 합니다.

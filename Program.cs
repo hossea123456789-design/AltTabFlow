@@ -241,19 +241,75 @@ internal static class SelfTests
         Check("대소문자 무시 앱 이름 검색",WindowCatalog.Build(rows,p,"excel",null,0).Count==2);
         Check("그룹 펼치기",WindowCatalog.Build(rows,p,"",rows[0].GroupKey,0).Count==2);
         p.Excluded.Add("CHROME"); Check("앱 제외 대소문자 무시",WindowCatalog.Build(rows,p,"",null,0).Count==2);p.Excluded.Clear();
-        p.Pinned.Add("slack"); Check("즐겨찾기 우선 표시",WindowCatalog.Build(rows,p,"",null,0)[0].Window.ProcessName=="slack");p.Pinned.Clear();
+        p.PrioritizePinned=true;p.Pinned.Add("slack"); Check("즐겨찾기 우선 표시",WindowCatalog.Build(rows,p,"",null,0)[0].Window.ProcessName=="slack");p.Pinned.Clear();p.PrioritizePinned=false;
         p.GroupApps=false;Check("묶기 해제",WindowCatalog.Build(rows,p,"",null,0).Count==4);p.GroupApps=true;
         Check("검색 결과 없음",WindowCatalog.Build(rows,p,"없는 제목",null,0).Count==0);
         var sortedRows=new[]{Row(10,"zeta","z",0),Row(11,"나무","n",1),Row(12,"Alpha","a",2),Row(13,"가방","g",3),Row(14,"beta","b",4),Row(15,"다람쥐","d",5)};
         string Sort(Preferences pref)=>string.Join(",",WindowCatalog.Build(sortedRows,pref,"",null,0).Select(x=>x.Window.AppName));
-        Check("영문 먼저 A~Z 이후 가나다순",Sort(new())=="Alpha,beta,zeta,가방,나무,다람쥐");
-        var mruEntries=WindowCatalog.Build(sortedRows,new(),"",null,0);
+        Check("새 설정 기본은 최근 사용 순이며 상단 우선도 꺼짐",!new Preferences().SortAlphabetically&&!new Preferences().PrioritizePinned);
+        var oldSort=JsonSerializer.Deserialize<Preferences>("{\"Pinned\":[\"zeta\"],\"Excluded\":[\"hidden\"],\"ColorPreset\":\"violet\"}")!;
+        Check("기존 설정은 등록 목록과 테마를 보존하고 최근 사용 순 적용",!oldSort.SortAlphabetically&&!oldSort.PrioritizePinned&&oldSort.Pinned.SequenceEqual(new[]{"zeta"})&&oldSort.Excluded.SequenceEqual(new[]{"hidden"})&&oldSort.ColorPreset=="violet");
+        Check("기본 목록은 이름 대신 최근 사용 순",Sort(new())=="zeta,나무,Alpha,가방,beta,다람쥐");
+        Check("기존 상단 등록 목록만으로 기본 MRU 순서를 바꾸지 않음",Sort(new(){Pinned=new(){"Alpha"}})=="zeta,나무,Alpha,가방,beta,다람쥐");
+        Check("등록 앱 우선만 켜면 각 구간도 최근 사용 순",Sort(new(){PrioritizePinned=true,Pinned=new(){"beta","나무"}})=="나무,beta,zeta,Alpha,가방,다람쥐");
+        Check("이름순만 켜면 등록 목록에 영향받지 않음",Sort(new(){SortAlphabetically=true,Pinned=new(){"zeta"}})=="Alpha,beta,zeta,가방,나무,다람쥐");
+        foreach(bool alpha in new[]{false,true})foreach(bool priority in new[]{false,true}){
+            var original=new Preferences{SortAlphabetically=alpha,PrioritizePinned=priority,Pinned=new(){"beta","나무"}};
+            var loaded=JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(original))!;
+            Check($"정렬 옵션 {alpha}/{priority} 저장 후 순서 유지",loaded.SortAlphabetically==alpha&&loaded.PrioritizePinned==priority&&Sort(original)==Sort(loaded));
+        }
+        var mixedOrder=new[]{Row(610,"EXCEL","오래된 문서",5),Row(611,"zeta","직전 창",1),Row(612,"EXCEL","현재 문서",0),Row(613,"Alpha","앞서 쓴 창",3)};
+        string Handles(IEnumerable<Entry> items)=>string.Join(",",items.Select(x=>x.Window.Handle.ToInt64()));
+        Check("입력 배열과 무관하게 그룹의 가장 최근 창으로 순위 결정",Handles(WindowCatalog.Build(mixedOrder,new(),"",null,0))=="612,611,613");
+        Check("같은 앱 내부는 오래된 생성 순서가 아닌 MRU",Handles(WindowCatalog.Build(mixedOrder,new(),"",mixedOrder[0].GroupKey,0))=="612,610");
+        Check("묶기 해제하면 실제 창 단위 MRU",Handles(WindowCatalog.Build(mixedOrder,new(){GroupApps=false},"",null,0))=="612,611,613,610");
+        Check("검색 결과도 최근 사용 순",Handles(WindowCatalog.Build(mixedOrder,new(),"문서",null,0))=="612,610");
+        Check("숨긴 앱을 제외해도 남은 창의 최근 사용 순 유지",Handles(WindowCatalog.Build(mixedOrder,new(){Excluded=new(){"zeta"}},"",null,0))=="612,613");
+        Check("최소화된 최근 창도 MRU 위치 유지",Handles(WindowCatalog.Build(mixedOrder.Select(w=>w with{Minimized=w.Handle==611}),new(),"",null,0))=="612,611,613");
+        var representativeOrder=WindowCatalog.Build(mixedOrder,new(),"",null,0);representativeOrder[0].SelectWindow(610);
+        Check("그룹의 선택 문서 변경만으로 표시 위치가 바뀌지 않음",Handles(representativeOrder)=="610,611,613");
+        Check("영문 먼저 A~Z 이후 가나다순",Sort(new(){SortAlphabetically=true})=="Alpha,beta,zeta,가방,나무,다람쥐");
+        var mruEntries=WindowCatalog.Build(sortedRows,new(){SortAlphabetically=true},"",null,0);
         var mru=new[]{sortedRows[2],sortedRows[5],sortedRows[0],sortedRows[1],sortedRows[3],sortedRows[4]};
         int lastApp=WindowCatalog.InitialSelection(mruEntries,mru,12,false,1);
         Check("이름순 화면에서도 첫 AltTab은 직전 프로그램",mruEntries[lastApp].Window.Handle==15);
         var reverseMru=new[]{sortedRows[5],sortedRows[2],sortedRows[0],sortedRows[1],sortedRows[3],sortedRows[4]};
         Check("다시 AltTab하면 직전 프로그램으로 왕복",mruEntries[WindowCatalog.InitialSelection(mruEntries,reverseMru,15,false,1)].Window.Handle==12);
         Check("영문 다음 항목이 직전 프로그램을 덮어쓰지 않음",lastApp!=1);
+        // 1.1.9: MRU is per physical window, not grouped row.
+        var excelMru=new[]{Row(301,"EXCEL","Excel A.xlsx",0),Row(302,"EXCEL","Excel B.xlsx",1),Row(303,"chrome","Chrome",2),Row(304,"EXCEL","Excel C.xlsx",3)};
+        foreach(bool grouped in new[]{true,false}){
+            var pref=new Preferences{GroupApps=grouped};
+            var es=WindowCatalog.Build(excelMru,pref,"",null,0);
+            int choice=WindowCatalog.InitialSelection(es,excelMru,301,false,1);
+            Check($"묶기 {grouped}: Excel A에서 직전 Excel B 선택",es[choice].Window.Handle==302);
+            Check($"묶기 {grouped}: 선택 제목도 Excel B와 일치",es[choice].Window.Title=="Excel B.xlsx");
+            var backMru=new[]{excelMru[1],excelMru[0],excelMru[2],excelMru[3]};
+            es=WindowCatalog.Build(backMru,pref,"",null,0);
+            Check($"묶기 {grouped}: Excel B에서 다시 A로 왕복",es[WindowCatalog.InitialSelection(es,backMru,302,false,1)].Window.Handle==301);
+            var chromeRecent=new[]{excelMru[0],excelMru[2],excelMru[1],excelMru[3]};
+            es=WindowCatalog.Build(chromeRecent,pref,"",null,0);
+            Check($"묶기 {grouped}: 직전이 Chrome이면 Excel B보다 우선",es[WindowCatalog.InitialSelection(es,chromeRecent,301,false,1)].Window.Handle==303);
+            var onlyExcel=excelMru.Where(w=>w.ProcessName=="EXCEL").ToArray();
+            es=WindowCatalog.Build(onlyExcel,pref,"",null,0);
+            Check($"묶기 {grouped}: Excel만 열려 있어도 다른 문서로 전환",es[WindowCatalog.InitialSelection(es,onlyExcel,301,false,1)].Window.Handle==302);
+            es=WindowCatalog.Build(excelMru,pref,"",null,0);
+            Check($"묶기 {grouped}: CtrlAltTab은 현재 Excel A 선택 유지",es[WindowCatalog.InitialSelection(es,excelMru,301,true,0)].Window.Handle==301);
+            es=WindowCatalog.Build(excelMru,pref,"",null,0);
+            Check($"묶기 {grouped}: 역방향 첫 선택도 창 단위 마지막 후보",es[WindowCatalog.InitialSelection(es,excelMru,301,false,-1)].Window.Handle==304);
+        }
+        var chromeMru=excelMru.Select(w=>w with{ProcessName=w.ProcessName=="EXCEL"?"chrome":"EXCEL",AppName=w.ProcessName=="EXCEL"?"Chrome":"Excel",Path=w.ProcessName=="EXCEL"?"C:/Apps/chrome.exe":"C:/Apps/EXCEL.exe"}).ToArray();
+        var chromeEntries=WindowCatalog.Build(chromeMru,new(),"",null,0);
+        Check("같은 앱 창 왕복은 Chrome에도 공통 적용",chromeEntries[WindowCatalog.InitialSelection(chromeEntries,chromeMru,301,false,1)].Window.Handle==302);
+        var excludedEntries=WindowCatalog.Build(excelMru,new Preferences{Excluded=new(){"EXCEL"}},"",null,0);
+        Check("창 단위 MRU에서도 숨긴 Excel은 다시 나타나지 않음",excludedEntries[WindowCatalog.InitialSelection(excludedEntries,excelMru,301,false,1)].Window.Handle==303);
+        // Extra edge contracts: absence of a viable previous window cannot
+        // create a stale or wrong HWND; selecting a member does not reorder it.
+        var singleExcel=WindowCatalog.Build(new[]{excelMru[0]},new(),"",null,0);
+        Check("단독 Excel 창은 자기 창을 벗어난 가짜 대상으로 바뀌지 않음",singleExcel[WindowCatalog.InitialSelection(singleExcel,new[]{excelMru[0]},301,false,1)].Window.Handle==301);
+        var multiExcel=WindowCatalog.Build(excelMru,new(),"",null,0);
+        multiExcel.First(e=>e.Window.ProcessName=="EXCEL").SelectWindow(302);
+        Check("대표 Excel 선택 후 그룹 Windows 순서는 변경되지 않음",multiExcel.First(e=>e.Window.ProcessName=="EXCEL").Windows.Select(w=>w.Handle).SequenceEqual(new nint[]{301,302,304}));
         var history=new ForegroundHistory();
         history.Record(10,1,100);history.Record(20,2,120);history.Record(30,3,140);
         Check("실제로 클릭한 창을 기준으로 최근 사용 순서 기록",history.Rank(30,3)>history.Rank(20,2)&&history.Rank(20,2)>history.Rank(10,1));
@@ -285,7 +341,7 @@ internal static class SelfTests
         Check("연속 왕복 제스처는 각각 따로 확정",QuickGesture.Length(Gesture(SwitchCommand.Next,SwitchCommand.Commit,SwitchCommand.Next,SwitchCommand.Commit),0)==2);
         Check("상세 화면은 현재 프로그램 선택으로 시작",mruEntries[WindowCatalog.InitialSelection(mruEntries,mru,12,true,0)].Window.Handle==12);
         Check("포커스 강조와 대상 창 앞으로 보이기 기본 켜짐",new Preferences().EmphasizeTarget&&new Preferences().PeekTarget);
-        var sortPrefs=new Preferences{Pinned=new(){"나무","zeta","Alpha"}};
+        var sortPrefs=new Preferences{SortAlphabetically=true,PrioritizePinned=true,Pinned=new(){"나무","zeta","Alpha"}};
         Check("등록 앱 내부도 등록 순서와 무관하게 이름순",Sort(sortPrefs)=="Alpha,zeta,나무,beta,가방,다람쥐");
         sortPrefs.Pinned.Reverse();Check("등록 목록 순서 변경은 화면 순서에 영향 없음",Sort(sortPrefs)=="Alpha,zeta,나무,beta,가방,다람쥐");
         sortPrefs.Excluded.Add("Alpha");Check("상단 등록해도 숨김 우선",Sort(sortPrefs)=="zeta,나무,beta,가방,다람쥐");
@@ -514,6 +570,36 @@ internal static class SelfTests
                     Check(mode+" 고정 화면이 남아 있어도 새 일반 AltTab은 빠른 전환 모드",form.Visible&&!form.IsPersistent);
                     pinnedFormRouter.Route(0xA4,false,false,false,false,true);
                     Check(mode+" 남아 있던 고정 화면도 일반 AltTab 해제에 선택 전환 후 닫힘",!form.Visible&&activated==200);
+                    // Same-process workbook MRU, title refresh, group drill-down.
+                    activated=0;form.PrepareNavigationTest(excelMru.ToList());form.TestInitialSelection(301);form.Show();
+                    Check(mode+" Excel 묶음의 첫 전환 대상은 다른 문서 B",form.NavigationState.Group==null&&form.NavigationState.Count==2&&form.NavigationState.Selected==302);
+                    form.TestRefresh(excelMru.Select(w=>w.Handle==302?w with{Title="Excel B 수정.xlsx"}:w).ToList());
+                    Check(mode+" 카탈로그 갱신 뒤에도 Excel B 선택 유지",form.NavigationState.Selected==302);
+                    form.TestKey(Keys.Enter);
+                    Check(mode+" Excel 묶음 진입 시 B를 그대로 하이라이트",form.NavigationState.Group!=null&&form.NavigationState.Count==3&&form.NavigationState.Selected==302);
+                    form.TestKey(Keys.Back);
+                    Check(mode+" Excel 묶음 복귀 시에도 B를 그대로 대표 창으로 유지",form.NavigationState.Group==null&&form.NavigationState.Selected==302);
+                    form.NavigationReleased();Check(mode+" Excel B로 실제 확정 경로 전달 후 닫힘",activated==302&&!form.Visible);
+                    activated=0;form.PrepareNavigationTest(excelMru.ToList());form.TestInitialSelection(301);form.Show();form.MoveSelection(1);
+                    Check(mode+" Excel B 이후 Tab은 표시된 다음 앱으로 이동",form.NavigationState.Selected==303);
+                    form.MoveSelection(-1);Check(mode+" 되돌아온 Excel 묶음은 선택했던 B를 유지",form.NavigationState.Selected==302);
+                    form.TestRefresh(excelMru.Where(w=>w.Handle!=302).ToList());
+                    Check(mode+" Excel B가 닫히면 사라진 HWND를 계속 선택하지 않음",form.NavigationState.Selected!=302);form.Dismiss(false);
+                    // 1.1.10 MRU display mode and user-selectable name sorting.
+                    var recentRows=new[]{Row(801,"zeta","현재 창",0),Row(802,"나무","직전 창",1),Row(803,"Alpha","그 이전 창",2),Row(804,"beta","오래된 창",3)}.ToList();
+                    navigationPrefs.Pinned=new(){"beta"};form.PrepareNavigationTest(recentRows);form.TestInitialSelection(801);
+                    Check(mode+" 기본 첫 AltTab은 MRU 두 번째 창",form.NavigationState.Selected==802);
+                    form.TestKey(Keys.Tab);Check(mode+" Tab 반복은 MRU 세 번째 창",form.NavigationState.Selected==803);
+                    form.TestKey(Keys.Tab);Check(mode+" Tab 반복은 MRU 네 번째 창",form.NavigationState.Selected==804);
+                    form.TestKey(Keys.Shift|Keys.Tab);Check(mode+" ShiftTab은 MRU 역방향",form.NavigationState.Selected==803);
+                    form.TestRefresh(recentRows.Select(w=>w with{Title=w.Title+" 갱신"}).ToList());form.TestKey(Keys.Tab);
+                    Check(mode+" 제목 갱신 중에도 선택과 탐색 순서 고정",form.NavigationState.Selected==804);
+                    navigationPrefs.SortAlphabetically=true;form.PrepareNavigationTest(recentRows);form.TestInitialSelection(801);form.TestKey(Keys.Tab);
+                    Check(mode+" 이름순 옵션을 켜면 다음 Tab은 이름순",form.NavigationState.Selected==803);
+                    navigationPrefs.SortAlphabetically=false;navigationPrefs.Pinned.Clear();
+                    var newRecent=new[]{recentRows[2] with{Order=0},recentRows[0] with{Order=1},recentRows[1] with{Order=2},recentRows[3] with{Order=3}}.ToList();
+                    form.PrepareNavigationTest(newRecent);form.TestInitialSelection(803);form.TestKey(Keys.Tab);
+                    Check(mode+" 새 제스처는 변경된 최근 사용 순 반영",form.NavigationState.Selected==802);
                 } finally {form.Shutdown();}
             }
         }

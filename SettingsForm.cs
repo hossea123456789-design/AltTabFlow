@@ -10,6 +10,8 @@ internal sealed class SettingsForm : Form
     private readonly FlowCheck primary=new(){Text="항상 주 모니터에 표시",Description="어느 화면에서 호출하든 같은 위치에 나타납니다."};
     private readonly FlowCheck startup=new(){Text="Windows 시작 시 자동 실행",Description="로그인하면 백그라운드에서 실행합니다."};
     private readonly FlowCheck elevatedStartup=new(){Text="로그인 시 관리자 권한으로 자동 시작",Description="최초 UAC 승인 후 작업 스케줄러로 자동 실행합니다."};
+    private readonly FlowCheck alphabetical=new(){Text="앱 이름순 정렬 (A~Z · 가나다)",Description="끄면 최근에 사용한 창 순서로 표시합니다. 기본값은 꺼짐입니다."};
+    private readonly FlowCheck pinnedFirst=new(){Text="등록한 앱 먼저 표시",Description="켜면 아래에 등록한 앱을 먼저 표시합니다. 등록 목록은 꺼도 보관됩니다."};
     private readonly FlowCheck highlight=new(){Text="창 테두리 아우라",Description="프리셋의 강조색이 선택한 창 모서리를 빠르게 돕니다."};
     private readonly FlowCheck emphasis=new(){Text="Alt+Tab 포커스 강조",Description="주변을 어둡게 하고 대상 창의 아우라를 강화합니다."};
     private readonly FlowCheck peek=new(){Text="선택한 창을 앞으로 미리 표시",Description="창의 실제 내용을 확인하며 전환할 수 있습니다."};
@@ -49,7 +51,7 @@ internal sealed class SettingsForm : Form
         SetStyle(ControlStyles.OptimizedDoubleBuffer|ControlStyles.AllPaintingInWmPaint|ControlStyles.ResizeRedraw,true);
         using(var stream=typeof(SettingsForm).Assembly.GetManifestResourceStream("AltTabFlow.Assets.AltTabFlow.ico"))Icon=new Icon(stream!);
         LabelAt(this,"AltTabFlow",24,18,180,28,16,true);LabelAt(this,"설정",216,16,500,36,21,true);LabelAt(this,"창 전환을 내 작업 방식에 맞춰 보세요.",216,59,596,24,10,false,true);
-        string[] names={"기본 동작","상단 정렬","색상 · 효과","숨길 앱"};
+        string[] names={"기본 동작","정렬","색상 · 효과","숨길 앱"};
         for(int i=0;i<names.Length;i++){int index=i;var nav=new FlowButton{Text=names[i],AlignLeft=true,Quiet=true,AccessibleName=names[i]};Place(this,nav,24,104+i*58,166,48);nav.Click+=(_,_)=>SelectPage(index);navigation.Add(nav);var page=new Panel{AutoScroll=true,TabStop=false,Anchor=AnchorStyles.Top|AnchorStyles.Bottom|AnchorStyles.Left|AnchorStyles.Right};Place(this,page,216,100,620,606);pages.Add(page);}
         LabelAt(this,"Tab 이동\nSpace 선택\nEsc 취소",40,370,150,74,9,false,true);
         var general=pages[0];PageHeading(general,"기본 동작","표시 방식과 전환 화면의 동작을 정합니다.");
@@ -74,14 +76,19 @@ internal sealed class SettingsForm : Form
             // against the shortcut overlay or show a fleeting password popup.
             GitHubUpdater.ShowWindow(()=>ExitForUpdate?.Invoke(),this);
         };
-        var ordering=pages[1];PageHeading(ordering,"상단 정렬","등록한 앱을 먼저, 각 그룹 안에서는 A~Z → 가나다순으로 표시합니다.");
+        var ordering=pages[1];PageHeading(ordering,"정렬","기본은 최근 사용 순입니다. 창을 클릭하거나 전환하면 앞순서가 됩니다.");
+        alphabetical.Checked=prefs.SortAlphabetically;pinnedFirst.Checked=prefs.PrioritizePinned;
+        var sortCard=Card(ordering,0,74,598,128);
+        Place(sortCard,alphabetical,8,6,582,58);Place(sortCard,pinnedFirst,8,64,582,58);
+        alphabetical.CheckedChanged+=(_,_)=>UpdateCount();pinnedFirst.CheckedChanged+=(_,_)=>UpdateCount();
         foreach(var w in windows.GroupBy(x=>x.ProcessName,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()))choices.Add(new(w.ProcessName,w.AppName,w));
         foreach(string process in prefs.Pinned)if(!choices.Any(x=>x.Process.Equals(process,StringComparison.OrdinalIgnoreCase)))choices.Add(new(process,WindowCatalog.AppName(process)));
-        var listCard=Card(ordering,0,74,598,342);Place(listCard,apps,10,12,578,318);FillChoices(prefs.Pinned);
-        var entry=Card(ordering,0,430,598,78);Place(entry,manual,16,27,438,26);manual.AccessibleName="상단 정렬에 등록할 프로세스 이름";
+        LabelAt(ordering,"먼저 표시할 앱",4,216,590,24,10,true);
+        var listCard=Card(ordering,0,250,598,234);Place(listCard,apps,10,12,578,210);FillChoices(prefs.Pinned);
+        var entry=Card(ordering,0,498,598,78);Place(entry,manual,16,27,438,26);manual.AccessibleName="상단 정렬에 등록할 프로세스 이름";
         var add=new FlowButton{Text="앱 등록"};Place(entry,add,468,18,112,40);add.Click+=(_,_)=>AddManual();manual.KeyDown+=(_,e)=>{if(e.KeyCode==Keys.Enter){AddManual();e.SuppressKeyPress=true;}};
-        Place(ordering,registered,4,524,594,24);registered.Tag="muted";UpdateCount();apps.ChecksChanged+=(_,_)=>UpdateCount();
-        LabelAt(ordering,"↑↓로 앱 선택 · Space로 등록/해제\n실행하지 않은 앱도 프로세스 이름으로 등록할 수 있습니다.",4,562,590,44,9,false,true);
+        Place(ordering,registered,4,590,594,24);registered.Tag="muted";UpdateCount();apps.ChecksChanged+=(_,_)=>UpdateCount();
+        LabelAt(ordering,"↑↓로 앱 선택 · Space로 등록/해제\n같은 앱의 개별 창은 항상 최근 사용 순으로 표시합니다.",4,624,590,44,9,false,true);
         var colors=pages[2];PageHeading(colors,"색상 · 효과","마음에 드는 색과 선택한 창을 강조하는 방식을 고르세요.");
         for(int i=0;i<ThemePalette.All.Length;i++){var preset=ThemePalette.All[i];var button=new FlowButton{Text=preset.Name,Swatch=preset,AccessibleName=preset.Name+" 색상 프리셋",Font=MakeFont(9)};Place(colors,button,(i%4)*151,74+(i/4)*62,145,54);button.Click+=(_,_)=>{palette=preset;ApplyColors();};swatches.Add(button);}
         Place(colors,sample,0,210,598,114);sample.Paint+=(_,e)=>PaintSample(e.Graphics);
@@ -108,7 +115,7 @@ internal sealed class SettingsForm : Form
     private void PaintSample(Graphics g){var p=palette;int D(float n)=>(int)Math.Round(n*DeviceDpi/96f);g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;g.Clear(p.Bg);UiPaint.Box(g,new Rectangle(1,1,sample.Width-3,sample.Height-3),p.Surface,D(12),UiPaint.Border(p));UiPaint.Text(g,"미리보기  ·  "+p.Name,Font,new Rectangle(D(18),D(12),sample.Width-D(36),D(24)),p.Muted);var r=new Rectangle(D(14),D(46),sample.Width-D(28),D(54));UiPaint.Box(g,r,p.Selected,D(9),p.Accent);AppIconDrawing.Paint(g,new Rectangle(D(26),D(59),D(28),D(28)),choices.FirstOrDefault(x=>x.Process.Equals("chrome",StringComparison.OrdinalIgnoreCase))?.AppIcon,"Chrome",Font,p);UiPaint.Text(g,"Chrome",Font,new Rectangle(D(64),D(51),D(150),D(24)),p.Ink);UiPaint.Text(g,"작업 중인 창 제목 · 선택한 창으로 전환",Font,new Rectangle(D(64),D(76),sample.Width-D(144),D(22)),p.Muted);UiPaint.Check(g,new Rectangle(sample.Width-D(48),D(63),D(20),D(20)),p.Accent);}
     private void FillChoices(IEnumerable<string> selected){var set=selected.ToHashSet(StringComparer.OrdinalIgnoreCase);apps.BeginUpdate();apps.Items.Clear();apps.ResetChecks();foreach(var option in choices.OrderBy(x=>x.Name,AppNameComparer.Instance)){apps.Items.Add(option);apps.SetChecked(option,set.Contains(option.Process));}apps.EndUpdate();}
     private void AddManual(){var names=Preferences.NormalizeApps(manual.Text.Split(new[]{',','\r','\n'},StringSplitOptions.RemoveEmptyEntries));var selected=apps.CheckedItems.Cast<AppOption>().Select(x=>x.Process).Concat(names).ToList();var added=new List<AppOption>();foreach(string process in names)if(!choices.Any(x=>x.Process.Equals(process,StringComparison.OrdinalIgnoreCase))){var item=new AppOption(process,WindowCatalog.AppName(process));choices.Add(item);added.Add(item);}FillChoices(selected);manual.Clear();UpdateCount();if(!PreviewRendering)_=LoadIcons(added.ToArray());}
-    private void UpdateCount()=>registered.Text=$"상단 등록 {apps.CheckedItems.Count()}개 · 등록 순서와 무관하게 이름순으로 정렬합니다.";
+    private void UpdateCount()=>registered.Text=$"상단 등록 {apps.CheckedItems.Count()}개 · "+(!pinnedFirst.Checked?"우선 표시는 꺼져 있습니다.":alphabetical.Checked?"등록 앱과 나머지를 각각 이름순으로 표시합니다.":"등록 앱과 나머지를 각각 최근 사용 순으로 표시합니다.");
     protected override void OnShown(EventArgs e){base.OnShown(e);if(PreviewRendering)return;if(!iconsStarted){iconsStarted=true;_=LoadIcons(choices.ToArray());}var work=Owner==null?Screen.FromControl(this).WorkingArea:Screen.FromControl(Owner).WorkingArea;Height=Math.Min(Height,work.Height-24);Location=new Point(Math.Clamp((Owner?.Left??work.Left)+((Owner?.Width??work.Width)-Width)/2,work.Left,Math.Max(work.Left,work.Right-Width)),Math.Clamp(work.Top+(work.Height-Height)/2,work.Top,Math.Max(work.Top,work.Bottom-Height)));}
     private async Task LoadIcons(AppOption[] items){
         var token=iconLoading.Token;
@@ -142,7 +149,7 @@ internal sealed class SettingsForm : Form
             ApplyValues();DialogResult=DialogResult.OK;Close();
         }catch(Exception ex){MessageBox.Show(this,"설정을 저장하지 못했습니다.\n"+ex.Message,"AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
     }
-    private void ApplyValues(){prefs.StartWithWindows=startup.Checked;prefs.ElevatedStartup=startup.Checked&&elevatedStartup.Checked;prefs.View=mode.SelectedItem?.ToString()??"목록";prefs.UiScale=int.Parse((size.SelectedItem?.ToString()??"100%").TrimEnd('%'));prefs.ReplaceAltTab=replace.Checked;prefs.GroupApps=grouped.Checked;prefs.ShowPreview=preview.Checked;prefs.CurrentMonitorOnly=monitor.Checked;prefs.OnPrimaryMonitor=primary.Checked;prefs.ColorPreset=palette.Id;prefs.LightTheme=palette.Light;prefs.HighlightTarget=highlight.Checked;prefs.EmphasizeTarget=emphasis.Checked;prefs.PeekTarget=peek.Checked;prefs.Excluded=Preferences.NormalizeApps(excluded.Text.Split(new[]{'\r','\n',','},StringSplitOptions.RemoveEmptyEntries));prefs.Pinned=apps.CheckedItems.Cast<AppOption>().OrderBy(x=>x.Name,AppNameComparer.Instance).Select(x=>x.Process).ToList();}
+    private void ApplyValues(){prefs.SortAlphabetically=alphabetical.Checked;prefs.PrioritizePinned=pinnedFirst.Checked;prefs.StartWithWindows=startup.Checked;prefs.ElevatedStartup=startup.Checked&&elevatedStartup.Checked;prefs.View=mode.SelectedItem?.ToString()??"목록";prefs.UiScale=int.Parse((size.SelectedItem?.ToString()??"100%").TrimEnd('%'));prefs.ReplaceAltTab=replace.Checked;prefs.GroupApps=grouped.Checked;prefs.ShowPreview=preview.Checked;prefs.CurrentMonitorOnly=monitor.Checked;prefs.OnPrimaryMonitor=primary.Checked;prefs.ColorPreset=palette.Id;prefs.LightTheme=palette.Light;prefs.HighlightTarget=highlight.Checked;prefs.EmphasizeTarget=emphasis.Checked;prefs.PeekTarget=peek.Checked;prefs.Excluded=Preferences.NormalizeApps(excluded.Text.Split(new[]{'\r','\n',','},StringSplitOptions.RemoveEmptyEntries));prefs.Pinned=apps.CheckedItems.Cast<AppOption>().OrderBy(x=>x.Name,AppNameComparer.Instance).Select(x=>x.Process).ToList();}
     internal void TestPage(int page,ThemePalette? p=null){if(p!=null){palette=p;ApplyColors();}SelectPage(page);}
     internal void TestApplyValues()=>ApplyValues();
     internal Task TestLoadIcons()=>LoadIcons(choices.ToArray());

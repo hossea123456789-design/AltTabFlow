@@ -10,6 +10,29 @@ internal static class UiTests
         string output=Path.Combine(Preferences.DataDirectory,"ui-previews");Directory.CreateDirectory(output);
         var windows=new List<WindowInfo>{new(101,"검토 중인 문서","chrome","Chrome","chrome.exe",0,false),new(102,"개발 작업","Code","Visual Studio Code","Code.exe",1,false),new(103,"일정 및 메시지","slack","Slack","slack.exe",2,false)};
         int dpi=96;
+        // Settings sorting options are staged, independently persisted and
+        // backward compatible with saved pinned entries.
+        var sortingPrefs=new Preferences{StartWithWindows=false,Pinned=new(){"chrome","missing_app"}};
+        using(var sortingForm=new SettingsForm(sortingPrefs,windows){PreviewRendering=true,PreviewOnly=true,TopMost=false,ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
+            sortingForm.Show();sortingForm.TestPage(1);
+            var checks=Walk(sortingForm.TestCurrentPage).OfType<FlowCheck>().ToArray();
+            var alpha=checks.Single(c=>c.Text.StartsWith("앱 이름순"));var priority=checks.Single(c=>c.Text=="등록한 앱 먼저 표시");
+            Check("sorting UI defaults to MRU with priority off",!alpha.Checked&&!priority.Checked);
+            alpha.Checked=true;priority.Checked=true;
+            Check("sorting changes do not apply before save",!sortingPrefs.SortAlphabetically&&!sortingPrefs.PrioritizePinned);
+            sortingForm.TestApplyValues();
+            Check("sorting checkboxes save independently",sortingPrefs.SortAlphabetically&&sortingPrefs.PrioritizePinned);
+            alpha.Checked=false;sortingForm.TestApplyValues();
+            Check("alphabetical off preserves priority option",!sortingPrefs.SortAlphabetically&&sortingPrefs.PrioritizePinned);
+            priority.Checked=false;sortingForm.TestApplyValues();
+            Check("returning to MRU preserves registered apps",!sortingPrefs.PrioritizePinned&&sortingPrefs.Pinned.Contains("chrome")&&sortingPrefs.Pinned.Contains("missing_app"));
+            alpha.Checked=true;sortingForm.Close();
+            Check("cancelled sorting edit leaves saved value unchanged",!sortingPrefs.SortAlphabetically);
+        }
+        using(var sortingForm=new SettingsForm(new Preferences{SortAlphabetically=true,PrioritizePinned=true},windows){PreviewRendering=true,PreviewOnly=true}){
+            sortingForm.TestPage(1);
+            Check("saved sorting choices reload checked",Walk(sortingForm.TestCurrentPage).OfType<FlowCheck>().All(c=>c.Checked));
+        }
         // Drive native TextBox message preprocessing, including the form's real
         // AcceptButton. No SendInput, user settings or startup registration.
         var editPrefs=new Preferences{StartWithWindows=false,Excluded=new(){"original_app"}};
