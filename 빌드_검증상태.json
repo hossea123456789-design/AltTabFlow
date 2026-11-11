@@ -1,5 +1,5 @@
 {
-  "version": "1.1.14",
+  "version": "1.1.15",
   "patchBase": "1.1.9",
   "changedSourceFiles": 9,
   "sourceFiles": 29,
@@ -26,7 +26,7 @@
   "githubActualScreenshots": "PASS main/settings/updater (CI #42842347985)",
   "mainMergeCommit": null,
   "githubBuiltExeSha256": "8c376e3f0db38e2cdfd2afaac9b9882d8ceecff1d3f2a0d747834407d9c8b658",
-  "baseVersion": "1.1.13",
+  "baseVersion": "1.1.14",
   "githubUpdater11": "PASS (11/11, CI 42832500112)",
   "elevatedGamePhysicalTest": "NOT_RUN",
   "fullUpdaterEndToEnd": "NOT_RUN",
@@ -36,14 +36,14 @@
   "mainMergeSha": "51175f30dd9c0e0aa8792593e3956703f7f24e8d",
   "candidateExeSha256": "c6dbe595d9416293044be6890e029ea9327f37d3f35c693b10fa0411d12405b7",
   "githubUi80": "PASS (80/80, CI 42832500112)",
-  "githubStartup11": "PENDING",
+  "githubStartup11": "PENDING branch CI",
   "physicalGameTest": "NOT_RUN",
   "physicalElevatedLoginTest": "NOT_RUN",
   "actualPrivateRepoUpdateTest": "NOT_RUN",
   "architectureChange": "TaskScheduler Interactive Highest + protected Program Files copy, standalone cancellable UpdateWindow, MouseWheel no persistent",
   "candidateExeSHA256": "420ccce48aa8e6caa903fc756266c515e8fe903d0732b4226fbd0025f6d41659",
   "githubUi85": "PASS 85/85",
-  "githubUpdater22": "PENDING",
+  "githubUpdater22": "PENDING branch CI",
   "publicBinaryRepository": "PUBLIC hossea123456789-design/AltTabFlow",
   "publicRelease": "PUBLISHED v1.1.12",
   "publisherSecret": "NOT_REQUIRED",
@@ -55,10 +55,18 @@
   "publicZipSha256": "54c7755a7d40c9fa4f95ba31bfb7b2b1a39e2906843c2156a7062f936cf97ea4",
   "publicZipBytes": 70529517,
   "githubUi96": "PASS (96/96 PR #11 CI 42855755651)",
-  "githubRelease": "PENDING v1.1.14",
+  "githubRelease": "PENDING v1.1.15",
   "userReportedGamePreviewFocusBug": "MapleStory row selected after Alt+Enter briefly hides chooser for 1-2 AltTabs",
   "userReportedPreviewTextOverlap": "MapleStory window title overlaps redundant preview footer label",
   "githubUi99": "PENDING 1.1.14 PR Windows CI",
   "rapidAltTabReport": "Very fast repeated Alt+Tab leaves chooser open, then delayed dismiss and subsequent input apparently dead",
-  "rapidInputQueueFix": "BOUNDED_FIFO_DRAIN 48 events/8ms, finally reschedule, deduplicate foreground activation"
+  "rapidInputQueueFix": "BOUNDED_FIFO_DRAIN 48 events/8ms, finally reschedule, deduplicate foreground activation",
+  "sourceRequirements": [
+    "AltTabFlow 1.1.9 user upload: same-process HWND MRU",
+    "AltTabFlow 1.1.10 user upload: MRU default and independent sort options"
+  ],
+  "githubBasic284": "PENDING branch CI",
+  "githubUi106": "PENDING branch CI",
+  "sameAppFocus12": "IMPLEMENTED; NOT TESTED WITH ACTUAL EXCEL ON USER PC",
+  "physicalExcelTest": "NOT RUN on user's current Windows PC"
 }
