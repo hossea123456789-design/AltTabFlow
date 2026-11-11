@@ -1,5 +1,15 @@
 # AltTabFlow — 후속 세션 인계 / START HERE
 
+## 1.1.15 회사 수정본 통합 — 2026-11-11
+
+- 사용자 업로드 `AltTabFlow_1.1.9_갱신내용.md`, `AltTabFlow_1.1.10_갱신내용.md` 순서 통합. 업로드 파일은 공개 GitHub로 원문 업로드하지 않음. 이전 1.1.9/1.1.10이라는 버전 번호는 회사 로컬 기준이므로 GitHub 최신 버전은 **1.1.15**로 증가.
+- 1.1.9: Excel A↔B 같은 프로세스의 독립 HWND MRU, 그룹/대표 분리, 제목 갱신 및 Enter/Backspace 선택 유지. Chrome에도 적용, owner/popup 체인 제외. 원본 창 키보드 훅과 MRU 기록 변경하지 않음. 실제 foreground 회귀 12건 추가.
+- 1.1.10: 기본 MRU, 옵션 `SortAlphabetically`과 `PrioritizePinned` 각각 기본 false. 그룹 정렬은 최근 멤버의 `Windows[0].Order`; 선택 문서 HWND 변경으로 그룹 위치가 바뀌지 않음. UI 저장/취소 후 적용, 기존 설정 무손실. 신규 Ctrl+P/우클릭 등록 시 우선 표시 활성화.
+- 기존 1.1.13 게임/프리뷰·1.1.14 48명령/8ms 큐 안정성 보존. CI 목표: 기본 **284** + UI **106** + updater22 + 관리자11 = **423**. 실제 Excel 파일 사용자 PC, 메이플 Alt+Enter, 전경/Peek/메뉴/UAC 검사는 무인 CI와 별도.
+- 배포 전 새 PR Windows CI success, main 동일 SHA Windows CI success, 릴리스 ZIP/SHA256SUMS 게시를 각각 확인해야 함.
+
+
+
 ## 1.1.14 빠른 Alt+Tab 반복 입력·후속 먹통 방지 (2026-11-11)
 
 - 기존 1.1.13 메이플 프리뷰/포커스 수정은 PR #11, CI #42855755651(335개) 성공 이후 main 병합 커밋 cde56a70.
