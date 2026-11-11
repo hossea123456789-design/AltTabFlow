@@ -10,6 +10,9 @@ internal sealed class Preferences
 {
     public string View { get; set; } = "목록";
     public bool GroupApps { get; set; } = true;
+    // Added in 1.1.15: missing settings fields deserialize as false (MRU default).
+    public bool SortAlphabetically { get; set; }
+    public bool PrioritizePinned { get; set; }
     public bool ReplaceAltTab { get; set; } = true;
     public bool CurrentMonitorOnly { get; set; }
     public bool OnPrimaryMonitor { get; set; } = true;
@@ -135,16 +138,19 @@ internal static class WindowCatalog
         var windows = source.Where(w => !p.Excluded.Contains(w.ProcessName, StringComparer.OrdinalIgnoreCase));
         if (p.CurrentMonitorOnly && monitor != 0) windows = windows.Where(w => Native.MonitorFromWindow(w.Handle, 2) == monitor);
         if (group != null) windows = windows.Where(w => w.GroupKey == group);
-        windows = windows.Where(w => Matches(w, query));
+        // Order is the frozen MRU rank for one gesture, not process startup order.
+        windows = windows.Where(w => Matches(w, query)).OrderBy(w => w.Order);
         List<Entry> entries;
         if (p.GroupApps && group == null && string.IsNullOrWhiteSpace(query))
             entries = windows.GroupBy(w => w.GroupKey).Select(g => new Entry { Windows = g.ToList() }).ToList();
         else entries = windows.Select(w => new Entry { Windows = new() { w } }).ToList();
         var pinned=p.Pinned.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return entries.OrderBy(e => pinned.Contains(e.Window.ProcessName)?0:1)
-            .ThenBy(e=>e.Window.AppName,AppNameComparer.Instance)
-            .ThenBy(e=>e.Window.GroupKey,StringComparer.OrdinalIgnoreCase)
-            .ThenBy(e => e.Window.Order).ToList();
+        var ordered=entries.OrderBy(e => p.PrioritizePinned&&pinned.Contains(e.Window.ProcessName)?0:1);
+        if(p.SortAlphabetically)ordered=ordered.ThenBy(e=>e.Window.AppName,AppNameComparer.Instance)
+            .ThenBy(e=>e.Window.GroupKey,StringComparer.OrdinalIgnoreCase);
+        // Use the newest member of a group, never the selected target; selecting
+        // another workbook must not shuffle the visible app groups.
+        return ordered.ThenBy(e => e.Windows[0].Order).ToList();
     }
     internal static int InitialSelection(IReadOnlyList<Entry> entries,IEnumerable<WindowInfo> recency,nint origin,bool pinned,int direction){
         int current=-1;
