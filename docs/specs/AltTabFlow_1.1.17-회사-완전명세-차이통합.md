@@ -13,7 +13,7 @@
 - 누른 실제 키를 모두 놓으면 일반 Alt+Tab 한 번 확정, 명시적 Ctrl+Alt+Tab/Space 고정, 늦은 Ctrl·Ctrl 해제 순서. 메뉴/IME VK_APPS(0x5D), VK_PROCESSKEY(0xE5), VK_PACKET(0xE7) 제외.
 - 미리보기 TargetPeek, 아우라/딤드·7색 프리셋, 단 게임 MapleStory Alt+Enter에서 전경/Topmost 경합을 피하도록 해당 게임 외부 Peek/Dim/Aura 생략.
 - 빠른 연타 대응 UI drain 48명령 또는 8ms의 유한 slice. 게임 관리자 재시작/예약 작업 자동 시작, Windows 10/11 .NET 8 portable 단일 EXE ZIP.
-- 현재 운영 업데이트는 공개 GitHub Releases에서 암호/토큰 없이 내려받고 GitHub SHA-256 digest와 EXE 버전 검증. 회사 Gitea feed로 교체하는 것은 이 사용자 GitHub 프로젝트의 목적과 충돌하므로 제외.
+- 현재 운영 업데이트는 공개 GitHub Releases에서 암호/토큰 없이 내려받고 GitHub SHA-256 digest와 EXE 버전 검증. 설치 트랜잭션은 기존 파일들을 별도 백업해 EXE를 마지막으로 교체하고 새 PID·버전·훅 확인 실패 때 정상 종료가 가능한 경우 복구. 시험용 임시 설치 폴더에 대해 8개 롤백 검사 추가. 회사 Gitea feed로 교체하는 것은 이 사용자 GitHub 프로젝트의 목적과 충돌하므로 제외.
 
 ## 실제 반영한 차이
 
@@ -38,8 +38,8 @@
 - `--self-test`: 314개 (기존 완료).
 - `--ui-self-test`: 133개 = 기존106 + 27 (세 보기 각각 버튼 폭/영역 분리/키 우선/마우스 우선/고정·취소/가짜 HWND X).
 - `--diagnostics-self-test`: 회사 독립 시험 프로세스 원본 52개 (실제 clean/kill/fatal, bounded queue, JSONL 회전, 원본/lastgood/bak/Corrupt/commit/잠금, 프로세스 간 설정 및 수정 성공).
-- `--updater-self-test` 22 + `--startup-self-test` 11. CI 기본 고유 목표 314+133+52+22+11=**532**.
-- `--peek-self-test` 10, `--menu-self-test` 7, `--focus-self-test` 30은 실제 Windows 전경 환경을 요구하고 focus에 peek10이 겹쳐 CI의 532 건과는 별개. ZIP 패키징 시 실제 창 검증도 필수.
+- `--updater-self-test` 22 + `--startup-self-test` 11. CI 기본 고유 목표 314+133+52+22+11=**540**.
+- `--peek-self-test` 10, `--menu-self-test` 7, `--focus-self-test` 30은 실제 Windows 전경 환경을 요구하고 focus에 peek10이 겹쳐 CI의 540 건과는 별개. ZIP 패키징 시 실제 창 검증도 필수.
 - 사용자 실제 환경의 P4 소유 팝업, Chrome 다중 창 마우스·키 릴리스, 실제 Excel A/B, 관리자 MapleStory Alt+Enter와 DXGI 전체화면은 자동 검증으로 대체 불가.
 
 ## 통합 이후 확인해야 할 경계
