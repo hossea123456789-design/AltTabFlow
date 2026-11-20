@@ -491,6 +491,42 @@ internal static class UpdaterTests
             Test("extracts game compatibility script beside exe",File.Exists(Path.Combine(temp,"Run-GameCompat.ps1")));
             Test("ignores unsafe ZIP entries",!File.Exists(Path.Combine(temp,"bad.txt")));
         } finally {Directory.Delete(temp,true);}
+        // Transactional updater: preserve previous installed EXE and sidecars,
+        // install EXE last, and reverse only the changes made by this update.
+        string txRoot=Path.Combine(Path.GetTempPath(),"altflow-updater-transaction-"+Guid.NewGuid().ToString("N"));
+        string txStage=Path.Combine(txRoot,"stage"),txInstall=Path.Combine(txRoot,"install");
+        Directory.CreateDirectory(txStage);Directory.CreateDirectory(txInstall);
+        try {
+            string installedExe=Path.Combine(txInstall,"AltTabFlow.exe");
+            File.WriteAllText(installedExe,"original executable");
+            File.WriteAllText(Path.Combine(txInstall,"Run-GameCompat.ps1"),"original script");
+            File.WriteAllText(Path.Combine(txInstall,"unrelated.txt"),"private note not part of updater");
+            File.WriteAllText(Path.Combine(txStage,"AltTabFlow.exe"),"upgraded executable");
+            File.WriteAllText(Path.Combine(txStage,"Run-GameCompat.ps1"),"upgraded script");
+            File.WriteAllText(Path.Combine(txStage,"사용법.txt"),"new usage guide");
+            var transaction=UpdateInstaller.ReplaceFiles(txStage,installedExe);
+            Test("updater transaction creates a distinct backup directory",
+                Directory.Exists(transaction.Backup)&&transaction.Backup.StartsWith(txInstall,StringComparison.OrdinalIgnoreCase));
+            Test("updater transaction backs up original EXE before replace",
+                File.ReadAllText(Path.Combine(transaction.Backup,"AltTabFlow.exe"))=="original executable");
+            Test("updater transaction backs up previous script",
+                File.ReadAllText(Path.Combine(transaction.Backup,"Run-GameCompat.ps1"))=="original script");
+            Test("updater transaction installs selected EXE and script",
+                File.ReadAllText(installedExe)=="upgraded executable"&&
+                File.ReadAllText(Path.Combine(txInstall,"Run-GameCompat.ps1"))=="upgraded script");
+            Test("updater transaction adds new guide but leaves unrelated user files",
+                File.ReadAllText(Path.Combine(txInstall,"사용법.txt"))=="new usage guide"&&
+                File.ReadAllText(Path.Combine(txInstall,"unrelated.txt"))=="private note not part of updater");
+            UpdateInstaller.RestoreFiles(transaction);
+            Test("rollback restores the exact original executable",
+                File.ReadAllText(installedExe)=="original executable");
+            Test("rollback restores prior sidecar and removes newly installed guide",
+                File.ReadAllText(Path.Combine(txInstall,"Run-GameCompat.ps1"))=="original script"&&
+                !File.Exists(Path.Combine(txInstall,"사용법.txt")));
+            Test("rollback preserves recoverable backups and unrelated user data",
+                File.Exists(Path.Combine(transaction.Backup,"AltTabFlow.exe"))&&
+                File.ReadAllText(Path.Combine(txInstall,"unrelated.txt"))=="private note not part of updater");
+        }finally{Directory.Delete(txRoot,true);}
         string report=Path.Combine(Preferences.DataDirectory,"updater-test.json");
         Directory.CreateDirectory(Preferences.DataDirectory);
         File.WriteAllText(report,JsonSerializer.Serialize(new{tests=checks,failures},new JsonSerializerOptions{WriteIndented=true}));
