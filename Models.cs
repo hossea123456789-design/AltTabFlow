@@ -119,6 +119,8 @@ internal sealed class Preferences
 
 internal sealed record WindowInfo(nint Handle, string Title, string ProcessName, string AppName, string Path, int Order, bool Minimized)
 {
+    // Cross-check stale/recycled HWND before asking a foreign window to close.
+    public uint ProcessId { get; init; }
     public string GroupKey => string.IsNullOrEmpty(Path) ? ProcessName.ToLowerInvariant() : Path.ToLowerInvariant();
 }
 
@@ -184,7 +186,7 @@ internal static class WindowCatalog
                     proc = (p.ProcessName, path); processCache[pid] = proc;
                 }
                 string name = Names.GetValueOrDefault(proc.Name, proc.Name);
-                windows.Add(new(h, title, proc.Name, name, proc.Path, windows.Count, Native.IsIconic(h)));
+                windows.Add(new(h, title, proc.Name, name, proc.Path, windows.Count, Native.IsIconic(h)){ProcessId=pid});
             } catch { /* A window may disappear while enumerating. */ }
             return true;
         }, 0);
