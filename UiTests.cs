@@ -199,6 +199,89 @@ internal static class UiTests
             form.PrepareNavigationTest(windows);using var bitmap=new Bitmap(form.Width,form.Height);form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(output,$"switcher-{view}.png"),ImageFormat.Png);
             var r=form.TestEntryBounds(0);var point=new Point(r.Left+12,r.Top+r.Height/2);form.TestMouse(point,true);Check(view+" mouse down does not activate prematurely",activated==0);form.TestMouse(Point.Empty,false);Check(view+" releasing outside cancels click",activated==0);form.TestMouse(point,true);form.TestMouse(point,false);Check(view+" releasing inside activates selected window",activated==101);form.Shutdown();
         }
+        // Company 1.1.15/1.1.16 acceptance: per-window X and 80x38 group
+        // counter; quick Alt+Tab must commit only after the in-flight mouse
+        // release, in either order. Never send a close to a real user window.
+        var groupedWindows=new List<WindowInfo>{
+            windows[0],windows[0] with{Handle=104,Title="Chrome second window",Order=1},
+            windows[1] with{Order=2},windows[2] with{Order=3}
+        };
+        using(var catalog=new CatalogService())foreach(string view in new[]{"목록","카드","아이콘"}){
+            var p=new Preferences{View=view,GroupApps=true,ShowPreview=false,PeekTarget=false,HighlightTarget=false,EmphasizeTarget=false};
+            nint activated=0;
+            using(var chooser=new SwitcherForm(p,catalog,h=>{activated=h;return true;}){InspectionMode=true,TopMost=false}){
+                chooser.PrepareNavigationTest(groupedWindows);chooser.Show();
+                using(var bitmap=new Bitmap(chooser.Width,chooser.Height))
+                    chooser.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
+                var expand=chooser.TestActionBounds("묶인 창 목록 펼치기");
+                var close=chooser.TestActionBounds("표시된 창 하나 닫기");
+                Check(view+" group button is more than twice the width of X",
+                    expand.Width>=close.Width*2&&expand.Height==close.Height);
+                Check(view+" group button and X hit regions never overlap",
+                    !expand.IntersectsWith(close)&&close.Width>0);
+                var point=new Point(expand.Left+expand.Width/2,expand.Top+expand.Height/2);
+                chooser.TestMouse(point,true);chooser.TestMouse(point,false);
+                Check(view+" group counter click never forces quick mode to pin",
+                    chooser.NavigationState.Group!=null&&!chooser.NavigationState.Persistent);
+                nint expected=chooser.NavigationState.Selected;
+                chooser.NavigationReleased();
+                Check(view+" mouse-first group expansion commits on last key-up",
+                    !chooser.Visible&&activated==expected&&activated!=0);
+                chooser.Shutdown();
+            }
+            activated=0;
+            using(var chooser=new SwitcherForm(p,catalog,h=>{activated=h;return true;}){InspectionMode=true,TopMost=false}){
+                chooser.PrepareNavigationTest(groupedWindows);chooser.Show();
+                using(var bitmap=new Bitmap(chooser.Width,chooser.Height))
+                    chooser.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
+                var expand=chooser.TestActionBounds("묶인 창 목록 펼치기");
+                var point=new Point(expand.Left+expand.Width/2,expand.Top+expand.Height/2);
+                chooser.TestMouse(point,true);chooser.NavigationReleased();
+                Check(view+" key-first release defers commit while group counter pressed",
+                    chooser.Visible&&chooser.TestPendingMouseCommit&&activated==0);
+                chooser.TestMouse(point,false);
+                Check(view+" key-first release commits after group click result",
+                    !chooser.Visible&&activated!=0&&!chooser.TestPendingMouseCommit);
+                chooser.Shutdown();
+            }
+            activated=0;
+            using(var chooser=new SwitcherForm(p,catalog,h=>{activated=h;return true;}){InspectionMode=true,TopMost=false}){
+                chooser.PrepareNavigationTest(groupedWindows);chooser.Show();
+                using(var bitmap=new Bitmap(chooser.Width,chooser.Height))
+                    chooser.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
+                var expand=chooser.TestActionBounds("묶인 창 목록 펼치기");
+                chooser.TestMouse(new Point(expand.Left+3,expand.Top+3),true);
+                chooser.NavigationReleased();chooser.TestMouse(Point.Empty,false);
+                Check(view+" mouse release outside counter still commits previous target",
+                    !chooser.Visible&&activated!=0&&!chooser.TestPendingMouseCommit);
+                chooser.Shutdown();
+            }
+            activated=0;
+            using(var chooser=new SwitcherForm(p,catalog,h=>{activated=h;return true;}){InspectionMode=true,TopMost=false}){
+                chooser.PrepareNavigationTest(groupedWindows,pinned:true);chooser.Show();
+                using(var bitmap=new Bitmap(chooser.Width,chooser.Height))
+                    chooser.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
+                var expand=chooser.TestActionBounds("묶인 창 목록 펼치기");
+                chooser.TestMouse(new Point(expand.Left+3,expand.Top+3),true);
+                chooser.TestMouse(new Point(expand.Left+3,expand.Top+3),false);
+                chooser.NavigationReleased();
+                Check(view+" pinned CtrlAltTab stays visible after group click and key release",
+                    chooser.Visible&&chooser.NavigationState.Persistent&&activated==0);
+                chooser.Shutdown();
+            }
+            activated=0;
+            using(var chooser=new SwitcherForm(p,catalog,h=>{activated=h;return true;}){InspectionMode=true,TopMost=false}){
+                chooser.PrepareNavigationTest(groupedWindows);chooser.Show();
+                using(var bitmap=new Bitmap(chooser.Width,chooser.Height))
+                    chooser.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
+                var close=chooser.TestActionBounds("표시된 창 하나 닫기");
+                chooser.TestMouse(new Point(close.Left+close.Width/2,close.Top+close.Height/2),true);
+                chooser.TestMouse(new Point(close.Left+close.Width/2,close.Top+close.Height/2),false);
+                Check(view+" X on invalid synthetic HWND cannot close or activate real window",
+                    chooser.Visible&&activated==0&&chooser.NavigationState.Persistent);
+                chooser.Shutdown();
+            }
+        }
         var report=new{failures,tests,dpi,previewDirectory=output};File.WriteAllText(Path.Combine(Preferences.DataDirectory,"ui-test.json"),JsonSerializer.Serialize(report,new JsonSerializerOptions{WriteIndented=true}));Environment.ExitCode=failures==0?0:1;
     }
 }
