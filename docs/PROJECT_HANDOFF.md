@@ -6,8 +6,8 @@
 - **기존 유지**: 개별 HWND MRU Excel/Chrome A↔B, 정렬 체크 2개·이름순 옵션, 메뉴/IME 키 종료 게이트 제외, MapleStory Alt+Enter 게임 Peek 생략/Z-order 보호, 48명령/8ms FIFO drain, 관리자 자동 시작, 공개 GitHub 업데이터/트레이.
 - **새 진단**: `RuntimeDiagnostics.cs`, `DiagnosticsTests.cs`. 중요 예외 별도 Flush(true), 512 bounded 큐, 1MB 이벤트/중요 로그 회전, `session.json` 이전 미완료 식별, 60초 상태, 콜백 오류 수집 및 정리 개별 수행. 회사 원본 자식 프로세스 기반 52개 검사 도입.
 - **설정 보존**: `Models.cs` `LoadFrom` 우선 순서 원본 → .lastgood → .bak. 유효 저장 Flash(true)/File.Replace, 명시적 저장 시 corrupt 원본 별도 보관, `Commit(next=>...)` 성공 전에 실행 값 변경하지 않음. `SettingsForm` UI는 저장 성공한 뒤에만 닫힘. `SwitcherContext` 생성 시 prefs.Save() 무조건 재저장 제거.
-- **UI**: 세 보기 × 36×38, 묶음 80×38, 서로 6 논리 px 이상 분리. WM_CLOSE는 원래 HWND PID 재확인 후 비동기 전달. 클릭 중 key-up은 `commitAfterMouseRelease`로 릴리스까지 보류. 고정 세션 독립 유지. 새 UI 검사 24개.
-- **기본 자동 CI 목표**: 314+130+22+11+52=529. Peek10/메뉴7/Foreground30 (10건 겹침) 별도 검사. 실제 회사 P4·게임·한글 IME·실물 키는 자동 검사로 대체하지 말 것.
+- **UI**: 세 보기 × 36×38, 묶음 80×38, 서로 6 논리 px 이상 분리. WM_CLOSE는 원래 HWND PID 재확인 후 비동기 전달. 클릭 중 key-up은 `commitAfterMouseRelease`로 릴리스까지 보류. 고정 세션 독립 유지. 새 UI 검사 27개.
+- **기본 자동 CI 목표**: 314+133+22+11+52=532. Peek10/메뉴7/Foreground30 (10건 겹침) 별도 검사. 실제 회사 P4·게임·한글 IME·실물 키는 자동 검사로 대체하지 말 것.
 - **업데이트 공급자**: 회사 Gitea URLs / 회사 manifest는 가져오지 않음. 공개 GitHub Releases/자동 교체 유지; 회사 개인 로그/설정/토큰은 공개 소스에 넣지 않음.
 - PR 검증 완료 전에는 실물 Windows/배포 완료로 선언하지 않음. PR CI → main 동일 SHA CI → v1.1.17 공개 릴리스 ZIP·SHA256SUMS 확인 후 사용자에게 결과 전달.
 
