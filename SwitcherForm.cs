@@ -699,6 +699,9 @@ internal sealed class SwitcherForm : Form
     internal void TestMouse(Point point,bool down){var e=new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0);if(down)OnMouseDown(e);else OnMouseUp(e);}
     internal void TestWheel(int delta)=>OnMouseWheel(new MouseEventArgs(MouseButtons.None,0,Width/2,Height/2,delta));
     internal Rectangle TestEntryBounds(int index)=>entryRects[index];
+    internal Rectangle TestActionBounds(string tip)=>hits.First(hit=>hit.Tip==tip).Rect;
+    internal bool TestPendingMouseCommit=>commitAfterMouseRelease;
+
     internal void TestActivate()=>activation.Request(Handle);
     internal ContextMenuStrip TestItemMenu(int index)=>ShowItemMenu(index,new Point(160,240));
     internal (string? Group,int Count,bool Persistent,nint Selected) NavigationState=>(group,entries.Count,persistent,selected<entries.Count?entries[selected].Window.Handle:0);
