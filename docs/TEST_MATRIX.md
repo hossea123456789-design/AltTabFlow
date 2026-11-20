@@ -1,4 +1,13 @@
-# 테스트·배포 매트릭스 (v1.1.16)
+# 테스트·배포 매트릭스 (v1.1.17)
+
+## 1.1.17 회사 완전명세 누락 기능 검증
+
+- [ ] Windows CI 기본 키/입력 314/314, UI 130/130(기존106 + X/묶음/키·마우스 해제 순서24), public updater22/22, 관리자 시작11/11, diagnostics+settings 52/52 = **529/529**.
+- [ ] `--diagnostics-self-test` 독립 프로세스에서 clean·실제 강제 종료·unhandled exception, 전용 critical marker, 4개 회전 로그, 저장 실패 시 bounded 큐, IPC 비응답 클라이언트 해제, 단계별 정리 후속 수행, 설정 원본/lastgood/bak 복구·커밋 무손실 검사.
+- [ ] 버튼 ×/묶음 폭·간격과 정상 WM_CLOSE PID 체크(허위 HWND에는 메시지 전송 금지). 앱 자체 저장 확인/취소는 Windows 실제 앱에서 별도 확인.
+- [ ] 묶음 마우스 클릭 뒤 키가 먼저 해제되면 클릭 해제 후 Commit, 마우스가 먼저 풀리면 다음 마지막 키 해제 Commit. 영역 밖 release, pinned 유지 및 반복 입력.
+- [ ] 메이플 전체화면/빠른 연타, Excel 실제 통합문서·P4 도구모음, 혼합 DPI·다중 모니터는 별도 물리 검증 범위.
+- [ ] 회사 내부 Gitea 배포 경로는 적용 안 함. 기존 GitHub 공개 릴리스 ZIP SHA-256 및 설정 보존 유지.
 
 ## 1.1.16 보조키 down 상태 일반 Alt+Tab 잔류 검증
 
