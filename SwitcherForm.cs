@@ -15,6 +15,7 @@ internal sealed class SwitcherForm : Form
     private readonly List<(Rectangle Rect, Action Action, string Tip)> hits = new();
     private Rectangle hoverRect,pressedRect;
     private Action? pressedAction;
+    private bool commitAfterMouseRelease;
     private readonly List<nint> thumbnails = new();
     private readonly List<(WindowInfo Window, Rectangle Rect)> desiredThumbs = new();
     private string thumbnailSignature = "", lastTip = "";
@@ -193,6 +194,7 @@ internal sealed class SwitcherForm : Form
     public void TrackForeground(nint hwnd)=>TrackForeground(hwnd,unchecked((uint)Environment.TickCount));
     public void OpenSwitcher(bool pinned, int direction = 1, bool sameApp = false) {
         if(committing)return;
+        commitAfterMouseRelease=false;
         lastNavigationTick=Stopwatch.GetTimestamp();
         // Each Alt+Tab gesture selects its own lifetime. A previously pinned UI
         // must not prevent a new plain gesture from committing on key release.
@@ -295,10 +297,21 @@ internal sealed class SwitcherForm : Form
         if(prefs.HighlightTarget)aura.Select(hwnd,Handle,Accent,prefs.EmphasizeTarget);else aura.Hide();
     }
     private void HideTargetVisuals(){visualTimer.Stop();aura.Hide();dimmer.Hide();peek.Restore();}
-    public void NavigationReleased(long timestamp=0) { releaseTimestamp=persistent?0:timestamp; if (Visible && !persistent && !configuring && !committing) Choose(); }
+    public void NavigationReleased(long timestamp=0) {
+        if(!Visible||persistent||configuring||committing)return;
+        releaseTimestamp=timestamp;
+        if(pressedAction!=null){commitAfterMouseRelease=true;return;}
+        Choose();
+    }
+    private void FinishDeferredRelease(){
+        if(!commitAfterMouseRelease)return;
+        commitAfterMouseRelease=false;
+        NavigationReleased(releaseTimestamp);
+    }
     public void PinSelection(){if(Visible&&!configuring&&!committing){persistent=true;releaseTimestamp=0;Invalidate();}}
     public void TogglePersistent() { if (Visible) Dismiss(true); else OpenSwitcher(true, 0); }
     public void Dismiss(bool restore) {
+        commitAfterMouseRelease=false;
         bool wasCommitting=committing;
         activation.Cancel();
         commitTimer.Stop();committing=false;
@@ -359,7 +372,7 @@ internal sealed class SwitcherForm : Form
         if(index<0)return false;
         selected=index;EnsurePage();UpdateAura();Invalidate();return true;
     }
-    private void SetView(string mode) { persistent=true; prefs.View=mode; SavePreferences(); ClearThumbnails(); ApplyBounds(); EnsurePage(); Invalidate(); }
+    private void SetView(string mode) { persistent=true; if(!ChangePreferences(next=>next.View=mode))return; ClearThumbnails(); ApplyBounds(); EnsurePage(); Invalidate(); }
     public void DetailedNavigate(Keys key) {
         if(!Visible||configuring)return;
         NavigateArrow(key);
@@ -370,7 +383,15 @@ internal sealed class SwitcherForm : Form
         else delta=key==Keys.Up?-columns:key==Keys.Down?columns:key==Keys.Left?-1:1;
         MoveSelection(delta);Invalidate();
     }
-    private void SavePreferences() { try { prefs.Save(); PreferencesChanged?.Invoke(); } catch (Exception ex) { AppLog.Write("settings-save-failed", new {ex.Message}); } }
+    private bool ChangePreferences(Action<Preferences> change){
+        try{prefs.Commit(change);PreferencesChanged?.Invoke();return true;}
+        catch(Exception ex){
+            AppLog.Write("settings-save-failed",new{error=ex.ToString()});
+            MessageBox.Show(this,"설정을 저장하지 못해 변경을 적용하지 않았습니다.\n"+ex.Message,
+                "AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+            return false;
+        }
+    }
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData) {
         Keys key = keyData & Keys.KeyCode; bool ctrl=(keyData & Keys.Control)!=0, shift=(keyData & Keys.Shift)!=0;
         if (key == Keys.Escape) {
@@ -406,7 +427,11 @@ internal sealed class SwitcherForm : Form
     }
     private void TogglePin() {
         if (selected >= entries.Count) return; string key=entries[selected].Window.ProcessName;
-        int index=prefs.Pinned.FindIndex(x=>x.Equals(key,StringComparison.OrdinalIgnoreCase)); if(index>=0)prefs.Pinned.RemoveAt(index);else {prefs.Pinned.Add(key);prefs.PrioritizePinned=true;} SavePreferences(); Rebuild(true);
+        if(ChangePreferences(next=>{
+            int index=next.Pinned.FindIndex(x=>x.Equals(key,StringComparison.OrdinalIgnoreCase));
+            if(index>=0)next.Pinned.RemoveAt(index);
+            else{next.Pinned.Add(key);next.PrioritizePinned=true;}
+        }))Rebuild(true);
     }
     private ContextMenuStrip ShowItemMenu(int index, Point point) {
         if(itemMenu.Visible)itemMenu.Close();
@@ -417,7 +442,12 @@ internal sealed class SwitcherForm : Form
         menu.Items.Add("이 창으로 전환", null, (_,_)=>Choose());
         if(item.IsGroup) menu.Items.Add($"{item.Windows.Count}개 창 펼치기",null,(_,_)=>ExpandGroup());
         menu.Items.Add(prefs.Pinned.Contains(item.Window.ProcessName,StringComparer.OrdinalIgnoreCase) ? "상단 정렬 해제" : "상단 정렬에 등록",null,(_,_)=>TogglePin());
-        menu.Items.Add("이 앱을 목록에서 숨기기",null,(_,_)=> { prefs.Excluded.Add(item.Window.ProcessName); SavePreferences(); Rebuild(false); });
+        menu.Items.Add("이 앱을 목록에서 숨기기",null,(_,_)=> {
+            if(ChangePreferences(next=>{
+                if(!next.Excluded.Contains(item.Window.ProcessName,StringComparer.OrdinalIgnoreCase))
+                    next.Excluded.Add(item.Window.ProcessName);
+            }))Rebuild(false);
+        });
         configuring=true; ShortcutSuppression?.Invoke(true); menu.Show(this, point);
         return menu;
     }
@@ -429,8 +459,20 @@ internal sealed class SwitcherForm : Form
         if(e.Button!=MouseButtons.Left) return;
         foreach(var hit in hits.AsEnumerable().Reverse()) if(hit.Rect.Contains(e.Location)) { pressedRect=hit.Rect;pressedAction=hit.Action;Capture=true;Invalidate(pressedRect);return; }
     }
-    protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);if(e.Button!=MouseButtons.Left)return;var action=pressedAction;var rect=pressedRect;pressedAction=null;pressedRect=Rectangle.Empty;Capture=false;Invalidate(rect);if(rect.Contains(e.Location))action?.Invoke();}
-    protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture){pressedAction=null;var old=pressedRect;pressedRect=Rectangle.Empty;if(!old.IsEmpty)Invalidate(old);}}
+    protected override void OnMouseUp(MouseEventArgs e){
+        base.OnMouseUp(e);if(e.Button!=MouseButtons.Left)return;
+        var action=pressedAction;var rect=pressedRect;
+        pressedAction=null;pressedRect=Rectangle.Empty;Capture=false;Invalidate(rect);
+        if(rect.Contains(e.Location))action?.Invoke();
+        FinishDeferredRelease();
+    }
+    protected override void OnMouseCaptureChanged(EventArgs e){
+        base.OnMouseCaptureChanged(e);
+        if(Capture||pressedAction==null)return;
+        pressedAction=null;var old=pressedRect;pressedRect=Rectangle.Empty;
+        if(!old.IsEmpty)Invalidate(old);
+        FinishDeferredRelease();
+    }
     protected override void OnMouseLeave(EventArgs e){base.OnMouseLeave(e);var old=hoverRect;hoverRect=Rectangle.Empty;if(!old.IsEmpty)Invalidate(old);}
     private readonly Dictionary<int,Rectangle> entryRects=new();
     private int HitEntry(Point p) { foreach(var kv in entryRects) if(kv.Value.Contains(p)) return kv.Key; return -1; }
@@ -481,8 +523,8 @@ internal sealed class SwitcherForm : Form
         string[] modes={"목록","카드","아이콘"};
         Box(g,R(28,143,233,42),Surface,11);
         for(int i=0;i<modes.Length;i++) { string mode=modes[i]; Button(g,mode,R(32+i*76,147,73,34),()=>SetView(mode),prefs.View==mode,$"Ctrl+{i+1}"); }
-        Button(g,prefs.GroupApps?"앱별 묶기  ✓":"앱별 묶기",R(277,145,132,38),()=> { persistent=true;prefs.GroupApps=!prefs.GroupApps; group=null; SavePreferences(); Rebuild(false); },prefs.GroupApps);
-        if(prefs.View=="목록")Button(g,listLayout.Preview?"미리보기  ✓":"미리보기",R(419,145,110,38),()=> {persistent=true;prefs.ShowPreview=!prefs.ShowPreview;SavePreferences();ClearThumbnails();ApplyBounds();EnsurePage();Invalidate();},listLayout.Preview,"목록 옆에 미리보기 표시 · 화면이 좁으면 자동 접힘");
+        Button(g,prefs.GroupApps?"앱별 묶기  ✓":"앱별 묶기",R(277,145,132,38),()=> { persistent=true;if(!ChangePreferences(next=>next.GroupApps=!next.GroupApps))return;group=null;Rebuild(false); },prefs.GroupApps);
+        if(prefs.View=="목록")Button(g,listLayout.Preview?"미리보기  ✓":"미리보기",R(419,145,110,38),()=> {persistent=true;if(!ChangePreferences(next=>next.ShowPreview=!next.ShowPreview))return;ClearThumbnails();ApplyBounds();EnsurePage();Invalidate();},listLayout.Preview,"목록 옆에 미리보기 표시 · 화면이 좁으면 자동 접힘");
         int total=entries.Sum(x=>x.Windows.Count);
         Txt(g,$"{entries.Count}개 항목  ·  {total}개 창",R(W-275,155,247,24),13,Muted,false,false,TextFormatFlags.Right);
         if(group!=null) {
@@ -599,7 +641,7 @@ internal sealed class SwitcherForm : Form
         persistent=true; configuring=true; HideTargetVisuals(); ShortcutSuppression?.Invoke(true); ClearThumbnails();
         try {
             using var dialog=new SettingsForm(prefs,catalog.Snapshot){ExitForUpdate=ExitRequested};
-            if(dialog.ShowDialog(this)==DialogResult.OK) { SavePreferences(); ApplyBounds(); ApplyTheme(); group=null; Rebuild(true); }
+            if(dialog.ShowDialog(this)==DialogResult.OK) { PreferencesChanged?.Invoke();ApplyBounds();ApplyTheme();group=null;Rebuild(true); }
         } finally { configuring=false; ShortcutSuppression?.Invoke(false); if(Visible) { Activate(); UpdateAura(); Invalidate(); } }
     }
     public object DiagnosticState() => new {
