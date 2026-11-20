@@ -18,6 +18,10 @@ internal static class Program
         TaskScheduler.UnobservedTaskException+=(_,e)=>{AppLog.Error("unobserved-task-error",e.Exception);e.SetObserved();};
         Directory.CreateDirectory(Preferences.DataDirectory);
         AppLog.Suppressed=args.Any(x=>x.EndsWith("self-test",StringComparison.Ordinal)||x.EndsWith("fixture",StringComparison.Ordinal));
+        if(args.Contains("--diagnostics-self-test")) { DiagnosticsTests.Run(); return; }
+        if(args.Length==3&&args[0]=="--diagnostics-fixture"){
+            DiagnosticsTests.Fixture(args[1],args[2]);return;
+        }
         if(args.Contains("--updater-self-test")) { UpdaterTests.Run(); return; }
         if(args.Contains("--startup-self-test")) { StartupTests.Run(); return; }
         if(args.Length>0&&args[0]=="--startup-task") { Environment.ExitCode=ElevatedStartup.RunHelper(args);return; }
