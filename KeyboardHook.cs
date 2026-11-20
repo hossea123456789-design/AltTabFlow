@@ -106,20 +106,25 @@ internal sealed class KeyboardHook : IDisposable
     private nuint releaseTimer;
     private uint threadId;
     private Exception? failure;
+    private readonly CallbackGuard inputGuard=new("keyboard");
+    private readonly CallbackGuard foregroundGuard=new("foreground");
+    private readonly CallbackGuard releaseGuard=new("release-timer");
     private long eventCount, tabCount;
     private long releaseWaitStarted;
     private bool releaseWaitLogged;
     private bool lastTabAlt, lastTabCtrl, lastTabAltFlag,lastTabAltPhysical;
     private object routingState=new{session=false};
-    public object Statistics => new {present=handle!=0,foregroundPresent=foregroundHook!=0,alive=thread.IsAlive,events=Interlocked.Read(ref eventCount),tabs=Interlocked.Read(ref tabCount),lastTabAlt,lastTabCtrl,lastTabAltFlag,lastTabAltPhysical,routing=Volatile.Read(ref routingState),physicalAlt=Native.GetAsyncKeyState(0x12)<0,physicalCtrl=Native.GetAsyncKeyState(0x11)<0,physicalShift=Native.GetAsyncKeyState(0x10)<0};
+    public object Statistics => new {present=handle!=0,foregroundPresent=foregroundHook!=0,alive=thread.IsAlive,
+        inputErrors=inputGuard.Failures,foregroundErrors=foregroundGuard.Failures,releaseErrors=releaseGuard.Failures,
+        events=Interlocked.Read(ref eventCount),tabs=Interlocked.Read(ref tabCount),lastTabAlt,lastTabCtrl,lastTabAltFlag,lastTabAltPhysical,routing=Volatile.Read(ref routingState),physicalAlt=Native.GetAsyncKeyState(0x12)<0,physicalCtrl=Native.GetAsyncKeyState(0x11)<0,physicalShift=Native.GetAsyncKeyState(0x10)<0};
     internal static bool AltSnapshot(uint key,uint flags,bool physicalAlt)=> (flags&0x20)!=0 || (key is not (0x12 or 0xA4 or 0xA5)&&physicalAlt);
     public volatile bool Enabled = true;
     public KeyboardHook(Action<SwitchCommand> post,Action<nint,uint>? foreground=null) {
         router = new ShortcutRouter(post,key=>Native.GetAsyncKeyState((int)key)<0); callback = Callback;
-        foregroundCallback=(_,_,hwnd,_,_,_,time)=> {
+        foregroundCallback=(_,_,hwnd,_,_,_,time)=>foregroundGuard.Invoke(()=>{
             // Delayed notifications describe history, not necessarily current focus.
             if(hwnd!=0&&hwnd==Native.GetForegroundWindow())foreground?.Invoke(hwnd,time);
-        };
+        });
         thread = new Thread(Run) { IsBackground = true, Name = "AltTabFlow shortcuts" };
         thread.Start(); ready.Wait(TimeSpan.FromSeconds(4));
         if (failure != null) throw failure;
@@ -135,6 +140,7 @@ internal sealed class KeyboardHook : IDisposable
         try {
             while (Native.GetMessage(out var message, 0, 0, 0) > 0) {
                 if(message.Msg==0x113&&releaseTimer!=0&&message.WParam==releaseTimer){
+                    releaseGuard.Invoke(()=>{
                     bool alt=Native.GetAsyncKeyState(0x12)<0,ctrl=Native.GetAsyncKeyState(0x11)<0,shift=Native.GetAsyncKeyState(0x10)<0;
                     router.ReconcileReleased(alt,ctrl,shift);
                     // 500ms is diagnostic only, never a forced dismissal.
@@ -145,10 +151,15 @@ internal sealed class KeyboardHook : IDisposable
                         }
                     } else {releaseWaitStarted=0;releaseWaitLogged=false;}
                     Volatile.Write(ref routingState,router.DiagnosticState());UpdateReleaseTimer();
+                    });
                 }
             }
+        }catch(Exception ex){AppLog.Error("hook-thread-error",ex);}
+        finally {
+            if(releaseTimer!=0)Native.KillTimer(0,releaseTimer);
+            Native.UnhookWindowsHookEx(handle);handle=0;
+            if(foregroundHook!=0)Native.UnhookWinEvent(foregroundHook);foregroundHook=0;
         }
-        finally { if(releaseTimer!=0)Native.KillTimer(0,releaseTimer);Native.UnhookWindowsHookEx(handle); handle = 0;if(foregroundHook!=0)Native.UnhookWinEvent(foregroundHook);foregroundHook=0; }
     }
     private void UpdateReleaseTimer(){
         if(router.IsActive&&releaseTimer==0)releaseTimer=Native.SetTimer(0,0,16,0);
@@ -179,7 +190,7 @@ internal sealed class KeyboardHook : IDisposable
             if(wasActive||router.IsActive||k.Key==9)Volatile.Write(ref routingState,router.DiagnosticState());
             UpdateReleaseTimer();
             if(captured)return 1;
-        } catch { /* A hook must never propagate exceptions into user input. */ }
+        }catch(Exception ex){inputGuard.Report(ex); /* Never propagate into native input. */}
         return Native.CallNextHookEx(handle, code, wp, lp);
     }
     public void Dispose() {
