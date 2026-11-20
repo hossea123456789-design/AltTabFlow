@@ -7,7 +7,8 @@
 - **새 진단**: `RuntimeDiagnostics.cs`, `DiagnosticsTests.cs`. 중요 예외 별도 Flush(true), 512 bounded 큐, 1MB 이벤트/중요 로그 회전, `session.json` 이전 미완료 식별, 60초 상태, 콜백 오류 수집 및 정리 개별 수행. 회사 원본 자식 프로세스 기반 52개 검사 도입.
 - **설정 보존**: `Models.cs` `LoadFrom` 우선 순서 원본 → .lastgood → .bak. 유효 저장 Flash(true)/File.Replace, 명시적 저장 시 corrupt 원본 별도 보관, `Commit(next=>...)` 성공 전에 실행 값 변경하지 않음. `SettingsForm` UI는 저장 성공한 뒤에만 닫힘. `SwitcherContext` 생성 시 prefs.Save() 무조건 재저장 제거.
 - **UI**: 세 보기 × 36×38, 묶음 80×38, 서로 6 논리 px 이상 분리. WM_CLOSE는 원래 HWND PID 재확인 후 비동기 전달. 클릭 중 key-up은 `commitAfterMouseRelease`로 릴리스까지 보류. 고정 세션 독립 유지. 새 UI 검사 27개.
-- **기본 자동 CI 목표**: 314+133+22+11+52=532. Peek10/메뉴7/Foreground30 (10건 겹침) 별도 검사. 실제 회사 P4·게임·한글 IME·실물 키는 자동 검사로 대체하지 말 것.
+- **기본 자동 CI 목표**: 314+133+22+11+52=540. Peek10/메뉴7/Foreground30 (10건 겹침) 별도 검사. 실제 회사 P4·게임·한글 IME·실물 키는 자동 검사로 대체하지 말 것.
+- **업데이트 설치 안정성**: 공개 GitHub ZIP 검증은 유지하고 EXE 마지막으로 파일별 백업/교체, 설치 후 실제 새 PID·버전·훅 확인, 실패 시 역순 롤백과 update-result.json을 추가. 사설 사용자 설정이나 외부 파일은 건드리지 않음. 실제 업데이트 설치 종단 간 물리 검증은 별도. 업데이트 테스트 22→30.
 - **업데이트 공급자**: 회사 Gitea URLs / 회사 manifest는 가져오지 않음. 공개 GitHub Releases/자동 교체 유지; 회사 개인 로그/설정/토큰은 공개 소스에 넣지 않음.
 - PR 검증 완료 전에는 실물 Windows/배포 완료로 선언하지 않음. PR CI → main 동일 SHA CI → v1.1.17 공개 릴리스 ZIP·SHA256SUMS 확인 후 사용자에게 결과 전달.
 
@@ -18,7 +19,7 @@
 - 업로드 `AltTabFlow_1.1.11_갱신내용.md`와 GitHub main v1.1.15 비교 결과 `KeyboardHook.cs`의 `knownDown/heldKeys`에 메뉴 VK_APPS=0x5D와 IME 전송 0xE5/0xE7가 들어가 세션이 고착될 위험 확인. 회사 수정본 명세의 진단에 따르면 `pinnedSession=false`, `heldKeys=[0x5D]`, Alt/Ctrl 실물 키 꺼짐, Commit 없음. 원인 앱/장치/리매퍼 특정 안 됨.
 - `ReleaseParticipant` 제외 키 3개만 입력 종료 게이트에서 제거하고 물리 key-up을 강제로 보내지 않음. 잔여 키/고정 Ctrl+Alt+Tab/게임/Excel MRU/정렬 기존 불변 조건 유지.
 - `auxiliaryKeyDowns`, `switch-open pinned/persistent`, 500ms 이상 대기 `release-wait` 1회 진단 추가. 500ms는 시간초과에 의한 강제 전환이 아님. 진단 내용은 전체 타이핑 기록 아님.
-- 새 라우터 22개 + 목록/카드/아이콘 폼 6개를 추가해 기본 검사 **286→314**; 기존 UI106+업데이터22+관리자11 유지, 자동 총 **453개**. Windows CI/실제 PC 검증을 분리.
+- 새 라우터 22개 + 목록/카드/아이콘 폼 6개를 추가해 기본 검사 **286→314**; 기존 UI106+업데이터30+관리자11 유지, 자동 총 **453개**. Windows CI/실제 PC 검증을 분리.
 - 이전 회사 로컬 ZIP/EXE의 SHA256은 새 GitHub 빌드에 적용되지 않음. GitHub 최신 v1.1.16 PR CI 성공, main 동일 SHA CI 성공, 공개 릴리스 파일+SHA256 확인 후 배포 완료 표기.
 - 사용자 회사 PC에서 보고된 '이제 둘 다 바로 닫힘'은 로컬 회사 v1.1.11의 확인이지 이 GitHub v1.1.16의 물리 키 검증이 아님.
 
@@ -29,7 +30,7 @@
 - 사용자 업로드 `AltTabFlow_1.1.9_갱신내용.md`, `AltTabFlow_1.1.10_갱신내용.md` 순서 통합. 업로드 파일은 공개 GitHub로 원문 업로드하지 않음. 이전 1.1.9/1.1.10이라는 버전 번호는 회사 로컬 기준이므로 GitHub 최신 버전은 **1.1.15**로 증가.
 - 1.1.9: Excel A↔B 같은 프로세스의 독립 HWND MRU, 그룹/대표 분리, 제목 갱신 및 Enter/Backspace 선택 유지. Chrome에도 적용, owner/popup 체인 제외. 원본 창 키보드 훅과 MRU 기록 변경하지 않음. 실제 foreground 회귀 12건 추가.
 - 1.1.10: 기본 MRU, 옵션 `SortAlphabetically`과 `PrioritizePinned` 각각 기본 false. 그룹 정렬은 최근 멤버의 `Windows[0].Order`; 선택 문서 HWND 변경으로 그룹 위치가 바뀌지 않음. UI 저장/취소 후 적용, 기존 설정 무손실. 신규 Ctrl+P/우클릭 등록 시 우선 표시 활성화.
-- 기존 1.1.13 게임/프리뷰·1.1.14 48명령/8ms 큐 안정성 보존. CI 목표: 기본 **286** + UI **106** + updater22 + 관리자11 = **425**. 실제 Excel 파일 사용자 PC, 메이플 Alt+Enter, 전경/Peek/메뉴/UAC 검사는 무인 CI와 별도.
+- 기존 1.1.13 게임/프리뷰·1.1.14 48명령/8ms 큐 안정성 보존. CI 목표: 기본 **286** + UI **106** + updater30 + 관리자11 = **425**. 실제 Excel 파일 사용자 PC, 메이플 Alt+Enter, 전경/Peek/메뉴/UAC 검사는 무인 CI와 별도.
 - 배포 전 새 PR Windows CI success, main 동일 SHA Windows CI success, 릴리스 ZIP/SHA256SUMS 게시를 각각 확인해야 함.
 
 
@@ -51,12 +52,12 @@
 - 이전 구현의 `TargetPeek.Select`가 선택된 **MapleStory 게임 HWND 자체를 chooser 뒤의 topmost Z-order 밴드로 임시 승격**. Alt+Enter 후 game fullscreen이 focus/desktop composition을 되잡는 상황의 유력 원인 후보. 선택 시 MapleStory 외부 Peek/Aura/Dim 억제, DWM 썸네일은 유지. 실제 실행 대상 전환은 기존 `Native.Activate`를 사용.
 - `SwitcherForm.Deactivate`는 origin으로 돌아온 경우 외에는 즉시 종료했기 때문에 게임이 타 창에서 재활성화돼도 종료됨. 실제 Alt 물리 키가 눌렸거나 마지막 전환 입력 220ms 이내의 **일반** Alt+Tab 세션을 잠시 보호(고정 세션 제외).
 - 미리보기 하단 안내는 창 제목 영역과 중복되어 제거. `LayoutPreviewSidebar`는 제목이 버튼 위로 오도록 가용 높이 조절. 확대 UI 580/650/735/950 logical viewport 검사.
-- 신규 UI 검사 11개, 목표: 기본206 + UI96 + updater22 + elevated startup11 = 총 **335**.
+- 신규 UI 검사 11개, 목표: 기본206 + UI96 + updater30 + elevated startup11 = 총 **335**.
 - 메이플 Alt+Enter 실사용·독점 전체화면 표시는 CI에서 검증할 수 없음. 안전하게 기존 1.1.12 유지한 채 1.1.13 릴리스 설치 후 직접 전환 비교.
 
 ## 1.1.12 최신 확정 배포 결과 (2026-11-11)
 
-- **main 1.1.12**: [PR #10 병합](https://github.com/hossea123456789-design/AltTabFlow/pull/10), [main Windows CI #42850336840 성공](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42850336840): 기본206 + UI85 + updater22 + 관리자 시작11 = **324/324 자동 검사 통과**.
+- **main 1.1.12**: [PR #10 병합](https://github.com/hossea123456789-design/AltTabFlow/pull/10), [main Windows CI #42850336840 성공](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42850336840): 기본206 + UI85 + updater30 + 관리자 시작11 = **324/324 자동 검사 통과**.
 - **단일 Public 저장소**: `hossea123456789-design/AltTabFlow` 공개 상태 확인. 두 번째 저장소/PAT/배포 Secret 필요 없음.
 - **자동 공개 릴리스 게시 실제 성공**: [Actions #42850768898](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42850768898), [v1.1.12 Release](https://github.com/hossea123456789-design/AltTabFlow/releases/tag/v1.1.12) 두 자산 확인: `AltTabFlow-win-x64.zip` (70,529,517바이트, SHA-256 `54c7755a7d40c9fa4f95ba31bfb7b2b1a39e2906843c2156a7062f936cf97ea4`) 및 `SHA256SUMS.txt`.
 - **사용자 최초 전환**: 1.1.11 이하에서는 이 1.1.12 공개 ZIP을 직접 받아 기존 실행 파일을 완전히 종료하고 한 번 교체. 이후 내장 '업데이트 확인'은 같은 Public Releases에서 토큰 없이 동작하도록 구현됨.
@@ -73,7 +74,7 @@
 - **1.1.13 수정 진행:** `fix/v1.1.13-maple-fullscreen-peek-preview-layout`에서 MapleStory Alt+Enter 후 전환창이 1~2회 가려지는 현상 및 오른쪽 제목 겹침 수정. CI/병합/릴리스 검증 전이며 **1.1.12 공개 배포 성공 기록은 유지**.
 
 - **1.1.12 단일 Public 저장소 전환 완료 (기존 작성 당시 PR 진행):** `feature/v1.1.12-single-public-repo-auto-release`에서 별도 `AltTabFlow-Downloads` 및 배포 PAT 의존성 제거, 동일 저장소 Release API + GITHUB_TOKEN 배포. GitHub 연결로 repo visibility 변경은 불가능하므로 **사용자의 일회성 Public 전환 필요**. 승인 전 실제 공개 릴리스가 생성됐다고 주장하지 말 것.
-- **직전 `main`: 1.1.11.** [PR #9](https://github.com/hossea123456789-design/AltTabFlow/pull/9) [성공 Windows CI #42862347985](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42862347985) 검증 후 [커밋 93fd8ce](https://github.com/hossea123456789-design/AltTabFlow/commit/93fd8ceb7e4fef0114a7ba941b9a1c78100493f7)로 병합 완료. 기본206 + UI85 + 업데이터22 + 관리자 시작11 = **324/324개 자동 검사 통과**. 실행 후보 ZIP·메인/설정/업데이트 WinForms 캡처 업로드 성공. **공개 실행 파일 저장소 미생성·실제 MapleStory/온라인 갱신 검증 미실행은 별도**.
+- **직전 `main`: 1.1.11.** [PR #9](https://github.com/hossea123456789-design/AltTabFlow/pull/9) [성공 Windows CI #42862347985](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42862347985) 검증 후 [커밋 93fd8ce](https://github.com/hossea123456789-design/AltTabFlow/commit/93fd8ceb7e4fef0114a7ba941b9a1c78100493f7)로 병합 완료. 기본206 + UI85 + 업데이터30 + 관리자 시작11 = **324/324개 자동 검사 통과**. 실행 후보 ZIP·메인/설정/업데이트 WinForms 캡처 업로드 성공. **공개 실행 파일 저장소 미생성·실제 MapleStory/온라인 갱신 검증 미실행은 별도**.
 - **이전 기준 1.1.10:** [PR #8](https://github.com/hossea123456789-design/AltTabFlow/pull/8)을 [Windows 성공 CI #42832500112](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42832500112) 이후 [커밋 0841c00](https://github.com/hossea123456789-design/AltTabFlow/commit/0841c00da08fa5287e971197894dfd2987b4ac14)로 병합했습니다. SHA-256·컴파일·단일 EXE·기본206/UI80/업데이터11/관리자 시작11 = **308개 CI 검사 성공**, 실제 메인·설정·업데이트 창 캡처 및 ZIP 업로드 성공.
 - **1.1.9 과거 기준:** 1.1.9, [PR #7](https://github.com/hossea123456789-design/AltTabFlow/pull/7)을 [Windows 성공 CI #42812687675](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42812687675) 이후 [커밋 51175f3](https://github.com/hossea123456789-design/AltTabFlow/commit/51175f30dd9c0e0aa8792593e3956703f7f24e8d)로 병합했습니다. 체크섬·컴파일·단일 EXE 게시·기본 206/206·UI 71/71·Updater 11/11·실제 메인/설정 캡처 및 동일 폴더 배포 후보 업로드까지 성공했습니다.
 - **직전 기준 버전 `main`: 1.1.8**, 소스 병합 커밋 [`8fca819`](https://github.com/hossea123456789-design/AltTabFlow/commit/8fca8193761bca80812b20c188350d7e4165f34f) ([PR #6](https://github.com/hossea123456789-design/AltTabFlow/pull/6)). 새 세션에서는 최신 `main` HEAD와 PR/Actions를 다시 확인하세요.
@@ -119,7 +120,7 @@
 - **독점 전체화면 한계:** DirectX exclusive fullscreen 또는 게임 보호 기능에서는 일반 TopMost 오버레이/전경 활성화 보장이 불가능. 사용자 PC의 게임 전체화면 창 모드 vs 독점 전체화면을 구분해 실험.
 - 배포: `AltTabFlow` 소스 저장소 PRIVATE 유지. 실행 파일만 `AltTabFlow-Downloads` PUBLIC Release(프리릴리스, ZIP+SHA256SUMS)로 배포. 클라이언트 인증 UI/PAT 저장·비공개 Actions 조회 제거, 공개 Releases API에서 버전·digest 검증 후 업그레이드.
 - 한 번 필요한 외부 설정: **PUBLIC `AltTabFlow-Downloads` 저장소 생성** 및 PRIVATE 소스 repo Actions Secret `ALTTABFLOW_PUBLIC_RELEASE_TOKEN`(대상 공개 저장소 Contents:RW 범위만). 현재 GitHub 커넥터가 저장소 생성과 Secrets 편집을 제공하지 않으므로 자동화 워크플로는 등록하되 배포가 **실제로 공개됐다고 말하지 않음**.
-- 자동 검사 목표: 기본206 + UI85(+5 game overlay) + 업데이트22(+11 public releases) + 관리자 시작11 = **324개**. 물리 메이플/P4·전경/Peek·실제 공개 다운로드 및 Windows 자동 교체는 별도 검증.
+- 자동 검사 목표: 기본206 + UI85(+5 game overlay) + 업데이트30(+11 public releases) + 관리자 시작11 = **324개**. 물리 메이플/P4·전경/Peek·실제 공개 다운로드 및 Windows 자동 교체는 별도 검증.
 
 ## 1.1.10 사용자 보고 버그·후속 개발
 
