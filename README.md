@@ -2,7 +2,7 @@
 
 **세션 간 후속 작업 시작점: [PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md)** · [전체 개발 이력](docs/DEVELOPMENT_HISTORY.md) · [동작 불변 조건](docs/ARCHITECTURE_AND_INVARIANTS.md) · [검증 매트릭스](docs/TEST_MATRIX.md)
 
-Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.16**입니다.
+Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전은 **1.1.17**입니다.
 
 > **업데이트/배포:** 기존 저장소 `hossea123456789-design/AltTabFlow` 자체가 Public인 경우 같은 저장소의 공개 Releases에서 익명으로 버전과 SHA-256을 확인하고 앱 버튼으로 교체합니다. 별도의 `AltTabFlow-Downloads` 저장소나 배포 PAT는 불필요합니다. **저장소 Public 및 [v1.1.12 공개 릴리스 게시 완료](https://github.com/hossea123456789-design/AltTabFlow/releases/tag/v1.1.12).**
 
@@ -15,6 +15,16 @@ Windows 10/11 x64용 Alt+Tab 대체 창 전환기입니다. 현재 소스 버전
 세 키는 기존대로 OS/다른 앱에 전달하고, 일반 Alt+Tab 해제 대기 집합에서만 제외합니다. 실제 키 Alt·Tab·방향키 등의 해제 조건과 명시적 Ctrl+Alt+Tab 고정은 보존합니다. 500ms `release-wait`는 세션당 1회 진단으로 **자동 종료하지 않습니다**. 회사 로컬 파일에 기록된 1.1.11 사용자 실사용 확인은 이 GitHub 릴리스 검증을 대체하지 않습니다.
 
 자동 Windows CI 기본 **314** + UI **106** + updater **22** + 관리자 **11** = **453개** 회귀 검사와 WinForms 화면 캡처를 포함합니다. 실제 회사 PC 특수 키·IME·메이플 게임 입력은 별도 실사용 확인이 필요합니다.
+
+## 1.1.17 회사 완전 명세 누락 기능 병합
+
+회사 로컬 1.1.16 명세를 기준으로 현재 GitHub 버전과 직접 비교했습니다. 새로 추가한 기능은 **비정상 종료/중요 예외 진단, 3세대 설정 파일 복구와 저장 실패 롤백, 목록·카드·아이콘의 창 닫기 × 및 큰 묶음 버튼, 일반 Alt+Tab에서 클릭 중 키를 먼저 놓을 때 클릭 후 확정**입니다. 자세한 변경별 근거는 [1.1.17 통합 명세](docs/specs/AltTabFlow_1.1.17-회사-완전명세-차이통합.md)에 보관합니다.
+
+설정은 `%LOCALAPPDATA%\AltTabFlow\settings.json`에 유지합니다. 새 `.lastgood`은 마지막 성공 저장본, `.bak`은 이전 정상 세대입니다. 손상 원본은 명시적 저장 전까지 보존되며, 저장 실패 시 실행 중 변경도 적용하지 않습니다. `critical.jsonl`, `session.json`, 회전하는 `events.jsonl`은 로컬 진단 파일이므로 공개 GitHub 배포 ZIP에 포함하지 않습니다.
+
+우측 ×는 제목에 보이는 창 **하나**에 정상 닫기를 요청합니다. 저장 확인/취소는 해당 앱에서 처리합니다. 묶음 개수 버튼을 누른 상태에서 Alt 키를 먼저 놓아도 클릭이 끝난 뒤 일반 모드가 확정됩니다. Ctrl+Alt+Tab은 기존대로 고정됩니다.
+
+기존 **공개 GitHub Releases** 업데이트 경로는 유지하며 회사 내부 Gitea로 전환하지 않습니다. Windows 자동 목표 검사는 기본314 + UI130 + 업데이트22 + 관리자11 + 종료/설정52 = **529개**입니다.
 
 ## 메이플스토리 전체화면(Alt+Enter)과 창 전환
 
