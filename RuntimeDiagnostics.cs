@@ -107,7 +107,9 @@ internal sealed class RunJournal {
                 if(previous!=null){
                     AtomicFile.Write(Path.Combine(Path.GetDirectoryName(path)!,"session.previous.json"),
                         File.ReadAllText(path));
-                    if(previous.State!="clean")
+                    if(previous.State=="clean")
+                        log.Critical("previous-session-clean",new{previous=previous.RunId});
+                    else
                         log.Critical("previous-session-incomplete",new{previous,
                             note="No clean shutdown record; terminating process and exact time are unknown."});
                 }
