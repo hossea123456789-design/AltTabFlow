@@ -223,7 +223,7 @@ internal sealed class SwitcherContext : ApplicationContext
                     case "hide": form.Dismiss(false); break;
                     case "pause": TogglePause(); break;
                     case "status": AtomicFile.Write(Path.Combine(Preferences.DataDirectory,"status.json"),
-                        JsonSerializer.Serialize(new{ui=form.DiagnosticState(),pid=Environment.ProcessId,elevated=GameCompatibility.IsElevated,paused,
+                        JsonSerializer.Serialize(new{ui=form.DiagnosticState(),pid=Environment.ProcessId,version=typeof(Program).Assembly.GetName().Version?.ToString(3),elevated=GameCompatibility.IsElevated,paused,
                             altTabEnabled=keyboard?.Enabled??false,hook=keyboard?.Statistics,
                             preferences=new{path=Preferences.FilePath,excludedCount=prefs.Excluded.Count,pinnedCount=prefs.Pinned.Count},
                             diagnostics=AppLog.Statistics,shortcuts=shortcutHistory.ToArray()},
