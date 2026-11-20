@@ -87,6 +87,9 @@ internal sealed class Preferences
         candidate.SaveTo(path??FilePath);
         CopyFrom(candidate);
     }
+    internal string Fingerprint()=>Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this))));
     public void Save()=>SaveTo(FilePath);
     internal void SaveTo(string path){
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
