@@ -36,10 +36,10 @@
 ## 회귀 검사 계획
 
 - `--self-test`: 314개 (기존 완료).
-- `--ui-self-test`: 130개 = 기존106 + 24 (세 보기 각각 버튼 폭/영역 분리/키 우선/마우스 우선/고정·취소/가짜 HWND X).
+- `--ui-self-test`: 133개 = 기존106 + 27 (세 보기 각각 버튼 폭/영역 분리/키 우선/마우스 우선/고정·취소/가짜 HWND X).
 - `--diagnostics-self-test`: 회사 독립 시험 프로세스 원본 52개 (실제 clean/kill/fatal, bounded queue, JSONL 회전, 원본/lastgood/bak/Corrupt/commit/잠금, 프로세스 간 설정 및 수정 성공).
-- `--updater-self-test` 22 + `--startup-self-test` 11. CI 기본 고유 목표 314+130+52+22+11=**529**.
-- `--peek-self-test` 10, `--menu-self-test` 7, `--focus-self-test` 30은 실제 Windows 전경 환경을 요구하고 focus에 peek10이 겹쳐 CI의 529 건과는 별개. ZIP 패키징 시 실제 창 검증도 필수.
+- `--updater-self-test` 22 + `--startup-self-test` 11. CI 기본 고유 목표 314+133+52+22+11=**532**.
+- `--peek-self-test` 10, `--menu-self-test` 7, `--focus-self-test` 30은 실제 Windows 전경 환경을 요구하고 focus에 peek10이 겹쳐 CI의 532 건과는 별개. ZIP 패키징 시 실제 창 검증도 필수.
 - 사용자 실제 환경의 P4 소유 팝업, Chrome 다중 창 마우스·키 릴리스, 실제 Excel A/B, 관리자 MapleStory Alt+Enter와 DXGI 전체화면은 자동 검증으로 대체 불가.
 
 ## 통합 이후 확인해야 할 경계
