@@ -231,6 +231,94 @@ internal static class UpdateInstaller
             if(file!=null&&file.Length<500_000)Extract(file,Path.Combine(destination,name));
         }
     }
+    private static readonly string[] InstallNames={
+        "Game-compat-mode.cmd","Run-GameCompat.ps1","사용법.txt","AltTabFlow.exe"
+    };
+    internal sealed record Replacement(string Backup,string Folder,string[] Changed);
+    // Stage sidecars first and EXE last. Back up every existing file before
+    // modifying it. User settings and unrelated files are never inspected.
+    internal static Replacement ReplaceFiles(string stage,string target){
+        if(!string.Equals(Path.GetFileName(target),"AltTabFlow.exe",StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Invalid AltTabFlow installation executable");
+        string folder=Path.GetDirectoryName(Path.GetFullPath(target))!;
+        if(!File.Exists(Path.Combine(stage,"AltTabFlow.exe")))
+            throw new FileNotFoundException("Staged executable missing");
+        string backup=Path.Combine(folder,".alttabflow-backups",
+            DateTimeOffset.Now.ToString("yyyyMMdd-HHmmssfff")+"-"+Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(backup);
+        var changed=new List<string>();
+        var operation=new Replacement(backup,folder,Array.Empty<string>());
+        try{
+            foreach(var name in InstallNames){
+                string source=Path.Combine(stage,name);
+                if(!File.Exists(source))continue;
+                string destination=Path.Combine(folder,name);
+                if(File.Exists(destination))File.Copy(destination,Path.Combine(backup,name),false);
+                string incoming=destination+"."+Guid.NewGuid().ToString("N")+".incoming";
+                try{
+                    File.Copy(source,incoming,false);
+                    if(File.Exists(destination))File.Replace(incoming,destination,null,true);
+                    else File.Move(incoming,destination);
+                    changed.Add(name);
+                }finally{if(File.Exists(incoming))File.Delete(incoming);}
+            }
+            return operation with{Changed=changed.ToArray()};
+        }catch{
+            // Restore exactly the files already changed; never delete other
+            // contents of the installation folder.
+            try{RestoreFiles(operation with{Changed=changed.ToArray()});}catch{}
+            throw;
+        }
+    }
+    internal static void RestoreFiles(Replacement operation){
+        foreach(var name in operation.Changed.Reverse()){
+            string original=Path.Combine(operation.Backup,name);
+            string destination=Path.Combine(operation.Folder,name);
+            if(!File.Exists(original)){if(File.Exists(destination))File.Delete(destination);continue;}
+            string incoming=destination+"."+Guid.NewGuid().ToString("N")+".rollback";
+            try{
+                File.Copy(original,incoming,false);
+                if(File.Exists(destination))File.Replace(incoming,destination,null,true);
+                else File.Move(incoming,destination);
+            }finally{if(File.Exists(incoming))File.Delete(incoming);}
+        }
+    }
+    private static bool SendIpc(string command){
+        try{
+            using var pipe=new System.IO.Pipes.NamedPipeClientStream(
+                ".","AltTabFlow."+Environment.UserName,System.IO.Pipes.PipeDirection.Out);
+            pipe.Connect(400);
+            using var writer=new StreamWriter(pipe);
+            writer.WriteLine(command);writer.Flush();return true;
+        }catch{return false;}
+    }
+    private static bool VerifyHealthy(Process launched,Version expected,DateTime launchUtc){
+        string file=Path.Combine(Preferences.DataDirectory,"status.json");
+        var stopwatch=Stopwatch.StartNew();
+        while(stopwatch.ElapsedMilliseconds<15_000){
+            if(launched.HasExited)return false;
+            if(SendIpc("status")){
+                Thread.Sleep(100);
+                try{
+                    if(File.GetLastWriteTimeUtc(file)<launchUtc.AddSeconds(-2))continue;
+                    using var json=JsonDocument.Parse(File.ReadAllText(file));
+                    var root=json.RootElement;
+                    if(root.GetProperty("pid").GetInt32()!=launched.Id)continue;
+                    if(root.GetProperty("version").GetString()!=expected.ToString(3))continue;
+                    var hook=root.GetProperty("hook");
+                    if(hook.GetProperty("alive").GetBoolean()&&hook.GetProperty("present").GetBoolean())return true;
+                }catch(FileNotFoundException){}catch(IOException){}catch(JsonException){}catch(KeyNotFoundException){}
+            }
+            Thread.Sleep(300);
+        }
+        return false;
+    }
+    private static void WriteUpdateResult(string state,string? version,string backup,string? error=null){
+        try{AtomicFile.Write(Path.Combine(Preferences.DataDirectory,"update-result.json"),
+            JsonSerializer.Serialize(new{time=DateTimeOffset.Now,state,version,backup,error},
+                new JsonSerializerOptions{WriteIndented=true}));}
+        catch{}
+    }
     internal static bool NeedsElevation(string folder)
     {
         try {
@@ -252,43 +340,85 @@ internal static class UpdateInstaller
         psi.ArgumentList.Add(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(stage,"AltTabFlow.exe")))));
         if(Process.Start(psi)==null)throw new InvalidOperationException("업데이트 도우미를 시작하지 못했습니다.");
     }
-    public static void Run(string[] args)
-    {
+    public static void Run(string[] args){
         if(args.Length!=5)throw new InvalidDataException("업데이트 인수 오류");
         string stage=Path.GetFullPath(args[1]),target=Path.GetFullPath(args[2]);
         if(!string.Equals(Path.GetFileName(target),"AltTabFlow.exe",StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("업데이트 대상이 AltTabFlow.exe가 아닙니다.");
-        if(!stage.StartsWith(Path.GetFullPath(Path.Combine(Preferences.DataDirectory,"updates"))+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))
+        if(!stage.StartsWith(Path.GetFullPath(Path.Combine(Preferences.DataDirectory,"updates"))+
+                Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("업데이트 임시 경로가 올바르지 않습니다.");
-        if(!int.TryParse(args[3],out int parentPid)||parentPid<=0||!Regex.IsMatch(args[4],@"^[A-Fa-f0-9]{64}$"))
+        if(!int.TryParse(args[3],out int parentPid)||parentPid<=0||
+           !Regex.IsMatch(args[4],@"^[A-Fa-f0-9]{64}$"))
             throw new InvalidDataException("업데이트 확인 값이 올바르지 않습니다.");
-        string staged=Path.Combine(stage,"AltTabFlow.exe");
-        try {
-            try {using var previous=Process.GetProcessById(parentPid);if(!previous.WaitForExit(30000))throw new TimeoutException("기존 AltTabFlow가 종료되지 않았습니다.");}
-            catch(ArgumentException){} // already exited
+        using var mutex=new Mutex(false,@"Local\AltTabFlow.Update."+Environment.UserName);
+        bool locked=false;
+        try{
+            try{locked=mutex.WaitOne(0);}catch(AbandonedMutexException){locked=true;}
+            if(!locked)throw new InvalidOperationException("다른 업데이트가 진행 중입니다.");
+            using(var previous=GetPreviousProcess(parentPid)){
+                if(previous!=null&&!previous.WaitForExit(15_000))
+                    throw new TimeoutException("기존 AltTabFlow가 정상 종료되지 않았습니다.");
+            }
+            string staged=Path.Combine(stage,"AltTabFlow.exe");
             string hash=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(staged)));
-            if(!hash.Equals(args[4],StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("교체할 EXE의 SHA-256 검증에 실패했습니다.");
-            string backup=target+".previous";
-            string incoming=target+".incoming";
-            File.Copy(staged,incoming,true);
-            bool replaced=false;
-            for(int attempt=0;attempt<12&&!replaced;attempt++){
-                try {File.Replace(incoming,target,backup,true);replaced=true;}
-                catch(IOException) when(attempt<11){Thread.Sleep(500);}
-            }
-            if(!replaced)throw new IOException("실행 파일을 교체하지 못했습니다.");
-            foreach(var name in new[]{"Game-compat-mode.cmd","Run-GameCompat.ps1","사용법.txt"}) {
-                var source=Path.Combine(stage,name);
-                if(File.Exists(source))File.Copy(source,Path.Combine(Path.GetDirectoryName(target)!,name),true);
-            }
-            var next=new ProcessStartInfo(target){UseShellExecute=true,WorkingDirectory=Path.GetDirectoryName(target)!};
-            next.ArgumentList.Add("--background");
-            if(Process.Start(next)==null)throw new IOException("새 버전의 실행을 시작하지 못했습니다.");
-            try {File.Delete(Path.Combine(stage,"candidate.zip"));}catch{}
-        } catch(Exception ex){
-            MessageBox.Show("자동 업데이트에 실패했습니다. 기존 실행 파일의 이전 버전 백업(.previous)을 확인하세요.\n"+ex.Message,"AltTabFlow 업데이트",MessageBoxButtons.OK,MessageBoxIcon.Error);
-        }
+            if(!hash.Equals(args[4],StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("교체할 EXE의 SHA-256 검증에 실패했습니다.");
+            string productVersion=FileVersionInfo.GetVersionInfo(staged).ProductVersion??"";
+            var found=Regex.Match(productVersion,@"^\d+\.\d+\.\d+");
+            if(!found.Success||!Version.TryParse(found.Value,out var version))
+                throw new InvalidDataException("교체 실행 파일 버전을 확인할 수 없습니다.");
+            Replacement? operation=null;
+            Process? child=null;
+            string backup="";
+            try{
+                operation=ReplaceFiles(stage,target);
+                backup=operation.Backup;
+                var next=new ProcessStartInfo(target){UseShellExecute=true,
+                    WorkingDirectory=Path.GetDirectoryName(target)!};
+                next.ArgumentList.Add("--background");
+                DateTime startedAt=DateTime.UtcNow;
+                child=Process.Start(next);
+                if(child==null||!VerifyHealthy(child,version,startedAt))
+                    throw new IOException("새 버전의 실제 PID/버전/키보드 훅 상태 확인에 실패했습니다.");
+                WriteUpdateResult("success",version.ToString(3),backup);
+            }catch(Exception ex){
+                bool canRestore=child==null||child.HasExited;
+                if(!canRestore){
+                    SendIpc("quit");canRestore=child!.WaitForExit(5000);
+                }
+                string result=canRestore?"failed":"restore-blocked-running-process";
+                if(canRestore&&operation!=null){
+                    try{
+                        RestoreFiles(operation);
+                        result="rolled-back";
+                        var restart=new ProcessStartInfo(target){UseShellExecute=true,
+                            WorkingDirectory=Path.GetDirectoryName(target)!};
+                        restart.ArgumentList.Add("--background");
+                        Process.Start(restart);
+                    }catch(Exception rollbackError){
+                        result="restore-failed";
+                        AppLog.Write("update-restore-failed",new{error=rollbackError.ToString(),backup});
+                    }
+                }else if(canRestore){
+                    // No replacement was made; restart the still-intact old EXE.
+                    try{var restart=new ProcessStartInfo(target){UseShellExecute=true,
+                        WorkingDirectory=Path.GetDirectoryName(target)!};
+                        restart.ArgumentList.Add("--background");Process.Start(restart);}catch{}
+                }
+                WriteUpdateResult(result,version.ToString(3),backup,ex.ToString());
+                throw new InvalidOperationException("설치 실패; "+result+" (백업 위치: "+backup+")",ex);
+            }finally{child?.Dispose();}
+        }catch(Exception ex){
+            MessageBox.Show("자동 업데이트에 실패했습니다. 백업 및 복구 상태를 확인하세요.\n"+ex.Message,
+                "AltTabFlow 업데이트",MessageBoxButtons.OK,MessageBoxIcon.Error);
+        }finally{if(locked)mutex.ReleaseMutex();}
     }
+    private static Process? GetPreviousProcess(int pid){
+        try{return Process.GetProcessById(pid);}
+        catch(ArgumentException){return null;}
+    }
+
 }
 
 internal static class UpdaterTests
@@ -361,6 +491,42 @@ internal static class UpdaterTests
             Test("extracts game compatibility script beside exe",File.Exists(Path.Combine(temp,"Run-GameCompat.ps1")));
             Test("ignores unsafe ZIP entries",!File.Exists(Path.Combine(temp,"bad.txt")));
         } finally {Directory.Delete(temp,true);}
+        // Transactional updater: preserve previous installed EXE and sidecars,
+        // install EXE last, and reverse only the changes made by this update.
+        string txRoot=Path.Combine(Path.GetTempPath(),"altflow-updater-transaction-"+Guid.NewGuid().ToString("N"));
+        string txStage=Path.Combine(txRoot,"stage"),txInstall=Path.Combine(txRoot,"install");
+        Directory.CreateDirectory(txStage);Directory.CreateDirectory(txInstall);
+        try {
+            string installedExe=Path.Combine(txInstall,"AltTabFlow.exe");
+            File.WriteAllText(installedExe,"original executable");
+            File.WriteAllText(Path.Combine(txInstall,"Run-GameCompat.ps1"),"original script");
+            File.WriteAllText(Path.Combine(txInstall,"unrelated.txt"),"private note not part of updater");
+            File.WriteAllText(Path.Combine(txStage,"AltTabFlow.exe"),"upgraded executable");
+            File.WriteAllText(Path.Combine(txStage,"Run-GameCompat.ps1"),"upgraded script");
+            File.WriteAllText(Path.Combine(txStage,"사용법.txt"),"new usage guide");
+            var transaction=UpdateInstaller.ReplaceFiles(txStage,installedExe);
+            Test("updater transaction creates a distinct backup directory",
+                Directory.Exists(transaction.Backup)&&transaction.Backup.StartsWith(txInstall,StringComparison.OrdinalIgnoreCase));
+            Test("updater transaction backs up original EXE before replace",
+                File.ReadAllText(Path.Combine(transaction.Backup,"AltTabFlow.exe"))=="original executable");
+            Test("updater transaction backs up previous script",
+                File.ReadAllText(Path.Combine(transaction.Backup,"Run-GameCompat.ps1"))=="original script");
+            Test("updater transaction installs selected EXE and script",
+                File.ReadAllText(installedExe)=="upgraded executable"&&
+                File.ReadAllText(Path.Combine(txInstall,"Run-GameCompat.ps1"))=="upgraded script");
+            Test("updater transaction adds new guide but leaves unrelated user files",
+                File.ReadAllText(Path.Combine(txInstall,"사용법.txt"))=="new usage guide"&&
+                File.ReadAllText(Path.Combine(txInstall,"unrelated.txt"))=="private note not part of updater");
+            UpdateInstaller.RestoreFiles(transaction);
+            Test("rollback restores the exact original executable",
+                File.ReadAllText(installedExe)=="original executable");
+            Test("rollback restores prior sidecar and removes newly installed guide",
+                File.ReadAllText(Path.Combine(txInstall,"Run-GameCompat.ps1"))=="original script"&&
+                !File.Exists(Path.Combine(txInstall,"사용법.txt")));
+            Test("rollback preserves recoverable backups and unrelated user data",
+                File.Exists(Path.Combine(transaction.Backup,"AltTabFlow.exe"))&&
+                File.ReadAllText(Path.Combine(txInstall,"unrelated.txt"))=="private note not part of updater");
+        }finally{Directory.Delete(txRoot,true);}
         string report=Path.Combine(Preferences.DataDirectory,"updater-test.json");
         Directory.CreateDirectory(Preferences.DataDirectory);
         File.WriteAllText(report,JsonSerializer.Serialize(new{tests=checks,failures},new JsonSerializerOptions{WriteIndented=true}));

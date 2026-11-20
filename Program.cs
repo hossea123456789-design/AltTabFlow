@@ -5,19 +5,6 @@ using System.Collections.Concurrent;
 
 namespace AltTabFlow;
 
-internal static class AppLog
-{
-    private static readonly object Gate=new();
-    public static bool Suppressed;
-    public static void Write(string evt,object data) {
-        if(Suppressed)return;
-        // Never block input or rendering for disk I/O.
-        ThreadPool.QueueUserWorkItem(_=> {
-            try { lock(Gate) { Directory.CreateDirectory(Preferences.DataDirectory); string path=Path.Combine(Preferences.DataDirectory,"events.jsonl"); if(File.Exists(path)&&new FileInfo(path).Length>1_000_000)File.Move(path,path+".previous",true); File.AppendAllText(path,JsonSerializer.Serialize(new{time=DateTimeOffset.Now,pid=Environment.ProcessId,evt,data})+Environment.NewLine); } } catch { }
-        });
-    }
-}
-
 internal static class Program
 {
     [STAThread]
@@ -25,10 +12,16 @@ internal static class Program
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Application.ThreadException+=(_,e)=>AppLog.Write("ui-error",new{e.Exception.Message,e.Exception.StackTrace});
-        AppDomain.CurrentDomain.UnhandledException+=(_,e)=>AppLog.Write("fatal-error",new{error=e.ExceptionObject.ToString()});
+        Application.ThreadException+=(_,e)=>AppLog.Error("ui-error",e.Exception);
+        AppDomain.CurrentDomain.UnhandledException+=(_,e)=>AppLog.Fatal(e.ExceptionObject,e.IsTerminating);
+        AppDomain.CurrentDomain.ProcessExit+=(_,_)=>AppLog.ProcessExiting();
+        TaskScheduler.UnobservedTaskException+=(_,e)=>{AppLog.Error("unobserved-task-error",e.Exception);e.SetObserved();};
         Directory.CreateDirectory(Preferences.DataDirectory);
         AppLog.Suppressed=args.Any(x=>x.EndsWith("self-test",StringComparison.Ordinal)||x.EndsWith("fixture",StringComparison.Ordinal));
+        if(args.Contains("--diagnostics-self-test")) { DiagnosticsTests.Run(); return; }
+        if(args.Length==3&&args[0]=="--diagnostics-fixture"){
+            DiagnosticsTests.Fixture(args[1],args[2]);return;
+        }
         if(args.Contains("--updater-self-test")) { UpdaterTests.Run(); return; }
         if(args.Contains("--startup-self-test")) { StartupTests.Run(); return; }
         if(args.Length>0&&args[0]=="--startup-task") { Environment.ExitCode=ElevatedStartup.RunHelper(args);return; }
@@ -56,12 +49,17 @@ internal static class Program
             }
         }
         if(args.Contains("--quit")||args.Contains("--status")||args.Contains("--pause")||args.Contains("--hide")) return;
-        bool running=false;
-        try { using var context=new SwitcherContext(args); running=true; Application.Run(context); }
-        catch(Exception ex) {
-            AppLog.Write(running?"runtime-error":"startup-error",new{ex.Message,ex.StackTrace});
-            MessageBox.Show((running?"AltTabFlow 실행 중 오류가 발생해 종료되었습니다.":"AltTabFlow를 시작하지 못했습니다.")+"\n"+ex.Message,"AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Error);
-        }
+        bool running=false,normal=false;
+        AppLog.BeginSession();
+        try{
+            using var context=new SwitcherContext(args);
+            running=true;Application.Run(context);
+            normal=context.ExitReason!=null;
+        }catch(Exception ex){
+            Environment.ExitCode=1;AppLog.Error(running?"runtime-error":"startup-error",ex);
+            MessageBox.Show((running?"AltTabFlow 실행 중 오류가 발생해 종료되었습니다.":"AltTabFlow를 시작하지 못했습니다.")+"\n"+ex.Message,
+                "AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Error);
+        }finally{AppLog.Finish(normal);}
     }
     internal static void SendCommand(string command) {
         try { using var pipe=new NamedPipeClientStream(".","AltTabFlow."+Environment.UserName,PipeDirection.Out); pipe.Connect(1800); using var writer=new StreamWriter(pipe); writer.WriteLine(command); writer.Flush(); } catch { }
@@ -93,11 +91,15 @@ internal sealed class SwitcherContext : ApplicationContext
     private readonly Queue<object> shortcutHistory=new();
     private readonly ToolStripMenuItem pauseMenu;
     private readonly System.Windows.Forms.Timer startupTimer=new(){Interval=350};
+    private readonly System.Threading.Timer healthTimer;
+    public string? ExitReason {get;private set;}
     public SwitcherContext(string[] args) {
         try {
-            Preferences.StartupEnabled=ElevatedStartup.UseRegistryRun(prefs.AutoStartByDefault,prefs.ElevatedStartup);
-            prefs.StartWithWindows=prefs.AutoStartByDefault;
-            prefs.Save();
+            bool autostart=prefs.AutoStartByDefault;
+            Preferences.StartupEnabled=ElevatedStartup.UseRegistryRun(autostart,prefs.ElevatedStartup);
+            // Never rewrite existing user settings unconditionally at startup.
+            if(prefs.StartWithWindows==null&&!File.Exists(Preferences.FilePath))
+                prefs.Commit(next=>next.StartWithWindows=autostart);
         }
         catch(Exception ex){AppLog.Write("startup-registration-failed",new{ex.Message});}
         form=new(prefs,catalog);
@@ -106,15 +108,18 @@ internal sealed class SwitcherContext : ApplicationContext
         form.CommitFinished=PostDrain;
         form.PreferencesChanged=()=> { if(keyboard!=null)keyboard.Enabled=prefs.ReplaceAltTab&&!paused&&!form.IsConfiguring; };
         form.ShortcutSuppression=suppress=> { if(keyboard!=null)keyboard.Enabled=prefs.ReplaceAltTab&&!paused&&!suppress; };
-        form.ExitRequested=Exit;
+        form.ExitRequested=()=>Exit("form-request");
         var menu=new ContextMenuStrip();
         menu.Items.Add("AltTabFlow 열기    Ctrl+Alt+Space",null,(_,_)=>form.OpenSwitcher(true,0));
         menu.Items.Add("설정",null,(_,_)=> { if(!form.Visible)form.OpenSwitcher(true,0); form.ShowSettings(); });
-        menu.Items.Add("업데이트 확인",null,(_,_)=>GitHubUpdater.ShowWindow(Exit));
+        menu.Items.Add("업데이트 확인",null,(_,_)=>GitHubUpdater.ShowWindow(()=>Exit("update-install")));
         menu.Items.Add(GameCompatibility.IsElevated?"게임 호환 관리자 모드: 켜짐":"게임 호환: 관리자 권한으로 다시 시작",null,(_,_)=>GameCompatibility.RequestElevatedRestart(form));
         pauseMenu=new ToolStripMenuItem("Alt+Tab 대체 일시 중지",null,(_,_)=>TogglePause()); menu.Items.Add(pauseMenu);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("완전히 종료 (기본 Alt+Tab 복원)",null,(_,_)=>Exit());
+        menu.Items.Add("완전히 종료 (기본 Alt+Tab 복원)",null,(_,_)=>{
+            // Return from ContextMenuStrip callback before disposing the tray/menu.
+            form.BeginInvoke((Action)(()=>Exit("tray-menu")));
+        });
         tray=new NotifyIcon { Icon=CreateIcon(),Text="AltTabFlow · Ctrl+Alt+Space",Visible=true,ContextMenuStrip=menu };
         tray.DoubleClick+=(_,_)=>form.OpenSwitcher(true,0);
         if(!args.Contains("--preview")) keyboard=new KeyboardHook(command=> {
@@ -125,6 +130,8 @@ internal sealed class SwitcherContext : ApplicationContext
             startupTimer.Stop();
             if(!args.Contains("--background"))form.OpenSwitcher(true,0);
         }; startupTimer.Start();
+        healthTimer=new System.Threading.Timer(_=>AppLog.Heartbeat(new{
+            paused,enabled=keyboard?.Enabled,hook=keyboard?.Statistics}),null,60_000,60_000);
         AppLog.Write("started",new{version=typeof(Program).Assembly.GetName().Version?.ToString(),preview=args.Contains("--preview"),pid=Environment.ProcessId,elevated=GameCompatibility.IsElevated,hook=keyboard?.Statistics});
     }
     private static Icon CreateIcon() {
@@ -205,24 +212,45 @@ internal sealed class SwitcherContext : ApplicationContext
             try {
                 using var server=new NamedPipeServerStream("AltTabFlow."+Environment.UserName,PipeDirection.In,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
                 await server.WaitForConnectionAsync(cancellation.Token);
-                using var reader=new StreamReader(server); var line=await reader.ReadLineAsync(cancellation.Token);
+                using var reader=new StreamReader(server);
+                using var readDeadline=CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
+                readDeadline.CancelAfter(TimeSpan.FromSeconds(2));
+                var line=await reader.ReadLineAsync(readDeadline.Token);
                 if(closing)break;
                 switch(line) {
                     case "show": form.OpenSwitcher(true,0); break;
-                    case "quit": Exit(); break;
+                    case "quit": Exit("ipc-quit"); break;
                     case "hide": form.Dismiss(false); break;
                     case "pause": TogglePause(); break;
-                    case "status": File.WriteAllText(Path.Combine(Preferences.DataDirectory,"status.json"),JsonSerializer.Serialize(new{ui=form.DiagnosticState(),pid=Environment.ProcessId,elevated=GameCompatibility.IsElevated,paused,altTabEnabled=keyboard?.Enabled??false,hook=keyboard?.Statistics,shortcuts=shortcutHistory.ToArray()},new JsonSerializerOptions{WriteIndented=true})); break;
+                    case "status": AtomicFile.Write(Path.Combine(Preferences.DataDirectory,"status.json"),
+                        JsonSerializer.Serialize(new{ui=form.DiagnosticState(),pid=Environment.ProcessId,version=typeof(Program).Assembly.GetName().Version?.ToString(3),elevated=GameCompatibility.IsElevated,paused,
+                            altTabEnabled=keyboard?.Enabled??false,hook=keyboard?.Statistics,
+                            preferences=new{path=Preferences.FilePath,excludedCount=prefs.Excluded.Count,pinnedCount=prefs.Pinned.Count},
+                            diagnostics=AppLog.Statistics,shortcuts=shortcutHistory.ToArray()},
+                            new JsonSerializerOptions{WriteIndented=true})); break;
                 }
-            } catch(OperationCanceledException){break;} catch(Exception ex){AppLog.Write("ipc-error",new{ex.Message}); if(!closing)await Task.Delay(200);}
+            }catch(OperationCanceledException){
+                if(cancellation.IsCancellationRequested)break;
+                AppLog.Write("ipc-client-timeout",new{});
+            }catch(Exception ex){AppLog.Write("ipc-error",new{ex.Message});if(!closing)await Task.Delay(200);}
         }
     }
-    private void Exit() {
-        if(closing)return; closing=true;
-        cancellation.Cancel(); startupTimer.Dispose(); keyboard?.Dispose();
-        tray.Visible=false; tray.Icon?.Dispose(); tray.Dispose(); catalog.Dispose(); form.Shutdown(); ExitThread();
+    private void Exit(string reason="form-request"){
+        if(closing)return;
+        closing=true;ExitReason=reason;AppLog.Stopping(reason);
+        CleanupSteps.Run(("ipc-cancel",()=>cancellation.Cancel()),
+            ("heartbeat",()=>healthTimer.Dispose()),
+            ("startup-timer",()=>startupTimer.Dispose()),
+            ("keyboard-hook",()=>keyboard?.Dispose()),
+            ("tray",()=>{tray.Visible=false;tray.Icon?.Dispose();tray.Dispose();}),
+            ("catalog",()=>catalog.Dispose()),
+            ("switcher",()=>form.Shutdown()));
+        ExitThread();
     }
-    protected override void Dispose(bool disposing) { if(disposing){Exit();cancellation.Dispose();}base.Dispose(disposing); }
+    protected override void Dispose(bool disposing){
+        if(disposing){Exit();cancellation.Dispose();}
+        base.Dispose(disposing);
+    }
 }
 
 internal static class SelfTests

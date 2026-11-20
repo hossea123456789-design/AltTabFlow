@@ -69,6 +69,7 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool DestroyIcon(nint icon);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode)] public static extern nint GetModuleHandle(string? module);
     [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+    [DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint mode);
     [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(nint hwnd, int attr, out int value, int size);
     [DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(nint hwnd, int attr, ref int value, int size);
     [DllImport("dwmapi.dll")] public static extern int DwmRegisterThumbnail(nint dest, nint source, out nint thumbnail);

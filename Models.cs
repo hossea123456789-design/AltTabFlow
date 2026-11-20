@@ -30,21 +30,85 @@ internal sealed class Preferences
     public List<string> Excluded { get; set; } = new();
     public static string DataDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AltTabFlow");
     public static string FilePath => Path.Combine(DataDirectory, "settings.json");
-    public static Preferences Load() {
-        try {
-            var p = JsonSerializer.Deserialize<Preferences>(File.ReadAllText(FilePath)) ?? new();
-            if (p.View != "목록" && p.View != "카드" && p.View != "아이콘") p.View = "목록";
-            p.UiScale = Math.Clamp(p.UiScale, 85, 140); p.Pinned ??= new(); p.Excluded ??= new();
-            p.Pinned=NormalizeApps(p.Pinned);p.Excluded=NormalizeApps(p.Excluded);
-            return p;
-        } catch { return new(); }
+    private static readonly JsonSerializerOptions SettingsJson = new() { WriteIndented = true };
+    public static Preferences Load() => LoadFrom(FilePath);
+    private static Preferences ReadValid(string path) {
+        var value=JsonSerializer.Deserialize<Preferences>(File.ReadAllText(path)) ?? throw new JsonException("Settings JSON is null");
+        if(value.View is not ("목록" or "카드" or "아이콘"))value.View="목록";
+        value.UiScale=Math.Clamp(value.UiScale,85,140);
+        value.Pinned=NormalizeApps(value.Pinned??new());
+        value.Excluded=NormalizeApps(value.Excluded??new());
+        return value;
     }
-    internal static List<string> NormalizeApps(IEnumerable<string> values) => values.Select(x=>x.Trim()).Where(x=>x.Length>0).Select(x=>x.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)?x[..^4]:x).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-    public void Save() {
-        Directory.CreateDirectory(DataDirectory);
-        var temp = FilePath + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
-        File.Move(temp, FilePath, true);
+    internal static Preferences LoadFrom(string path) {
+        foreach(var suffix in new[]{"",".lastgood",".bak"}){
+            try{
+                var value=ReadValid(path+suffix);
+                if(suffix=="")SeedLastGood(path);
+                else AppLog.Write("settings-backup-recovered",new{suffix});
+                return value;
+            }catch(FileNotFoundException){}catch(DirectoryNotFoundException){}
+            catch(Exception ex){AppLog.Write("settings-load-error",new{source=suffix,error=ex.GetType().Name});}
+        }
+        return new Preferences();
+    }
+    private static void WriteDurably(string path,string contents) {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        var temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";
+        try{
+            using(var stream=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){
+                byte[] data=System.Text.Encoding.UTF8.GetBytes(contents);
+                stream.Write(data,0,data.Length);
+                stream.Flush(true);
+            }
+            File.Move(temp,path,true);
+        }finally{if(File.Exists(temp))File.Delete(temp);}
+    }
+    private static void SeedLastGood(string path) {
+        try{
+            var value=File.ReadAllText(path);
+            var lastgood=path+".lastgood";
+            if(!File.Exists(lastgood)||File.ReadAllText(lastgood)!=value)WriteDurably(lastgood,value);
+        }catch(Exception ex){AppLog.Write("settings-recovery-copy-failed",new{error=ex.GetType().Name});}
+    }
+    internal static List<string> NormalizeApps(IEnumerable<string> values) => values
+        .Where(x=>!string.IsNullOrWhiteSpace(x)).Select(x=>x.Trim())
+        .Select(x=>x.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)?x[..^4]:x)
+        .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    internal Preferences Copy()=>JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(this))!;
+    internal void CopyFrom(Preferences other){
+        foreach(var property in typeof(Preferences).GetProperties(System.Reflection.BindingFlags.Public|System.Reflection.BindingFlags.Instance).Where(p=>p.CanWrite))
+            property.SetValue(this,property.GetValue(other));
+    }
+    // No in-memory mutation until the durable, recoverable on-disk write succeeded.
+    internal void Commit(Action<Preferences> change,string? path=null){
+        var candidate=Copy();
+        change(candidate);
+        candidate.SaveTo(path??FilePath);
+        CopyFrom(candidate);
+    }
+    internal string Fingerprint()=>Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this))));
+    public void Save()=>SaveTo(FilePath);
+    internal void SaveTo(string path){
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        var temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";
+        try{
+            using(var stream=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){
+                byte[] bytes=System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this,SettingsJson));
+                stream.Write(bytes,0,bytes.Length);
+                stream.Flush(true);
+            }
+            if(File.Exists(path)){
+                bool valid=true;
+                try{_ = ReadValid(path);}catch{valid=false;}
+                if(!valid)File.Copy(path,path+".corrupt-"+DateTimeOffset.Now.ToString("yyyyMMdd-HHmmssfff")+"-"+Guid.NewGuid().ToString("N"));
+                File.Replace(temp,path,valid?path+".bak":null);
+            }else File.Move(temp,path);
+            // .lastgood is the latest successful generation, .bak the previous.
+            SeedLastGood(path);
+        }finally{if(File.Exists(temp))File.Delete(temp);}
     }
     public static bool StartupEnabled {
         get { using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"); return key?.GetValue("AltTabFlow") != null; }
@@ -58,6 +122,8 @@ internal sealed class Preferences
 
 internal sealed record WindowInfo(nint Handle, string Title, string ProcessName, string AppName, string Path, int Order, bool Minimized)
 {
+    // Cross-check stale/recycled HWND before asking a foreign window to close.
+    public uint ProcessId { get; init; }
     public string GroupKey => string.IsNullOrEmpty(Path) ? ProcessName.ToLowerInvariant() : Path.ToLowerInvariant();
 }
 
@@ -123,7 +189,7 @@ internal static class WindowCatalog
                     proc = (p.ProcessName, path); processCache[pid] = proc;
                 }
                 string name = Names.GetValueOrDefault(proc.Name, proc.Name);
-                windows.Add(new(h, title, proc.Name, name, proc.Path, windows.Count, Native.IsIconic(h)));
+                windows.Add(new(h, title, proc.Name, name, proc.Path, windows.Count, Native.IsIconic(h)){ProcessId=pid});
             } catch { /* A window may disappear while enumerating. */ }
             return true;
         }, 0);

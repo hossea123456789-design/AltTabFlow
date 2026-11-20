@@ -141,15 +141,42 @@ internal sealed class SettingsForm : Form
             if(!PreviewOnly){
                 bool hasTask=ElevatedStartup.IsInstalled;
                 if(wantElevated!=prefs.ElevatedStartup||
-                   (wantElevated&&!hasTask)||(!wantElevated&&hasTask)){
-                    if(!ElevatedStartup.Configure(this,wantElevated))return; // UAC cancelled: retain existing settings.
+                    (wantElevated&&!hasTask)||(!wantElevated&&hasTask)){
+                    if(!ElevatedStartup.Configure(this,wantElevated))return; // UAC cancellation.
                 }
-                Preferences.StartupEnabled=ElevatedStartup.UseRegistryRun(startup.Checked,wantElevated);
-            }
-            ApplyValues();DialogResult=DialogResult.OK;Close();
-        }catch(Exception ex){MessageBox.Show(this,"설정을 저장하지 못했습니다.\n"+ex.Message,"AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+                // Save a copy first. Failed disk writes cannot alter the live
+                // settings, hide rules, pinned apps or preview colors.
+                prefs.Commit(next=>ApplyValues(next));
+                try{Preferences.StartupEnabled=ElevatedStartup.UseRegistryRun(startup.Checked,wantElevated);}
+                catch(Exception ex){AppLog.Write("startup-registration-failed",new{error=ex.ToString()});MessageBox.Show(this,
+                    "설정은 저장됐지만 Windows 시작 등록에 실패했습니다.\n"+ex.Message,
+                    "AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+            }else ApplyValues(prefs);
+            DialogResult=DialogResult.OK;Close();
+        }catch(Exception ex){
+            AppLog.Write("settings-save-failed",new{error=ex.ToString()});
+            MessageBox.Show(this,"설정을 저장하지 못해 변경을 적용하지 않았습니다.\n"+ex.Message,
+                "AltTabFlow",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+        }
     }
-    private void ApplyValues(){prefs.SortAlphabetically=alphabetical.Checked;prefs.PrioritizePinned=pinnedFirst.Checked;prefs.StartWithWindows=startup.Checked;prefs.ElevatedStartup=startup.Checked&&elevatedStartup.Checked;prefs.View=mode.SelectedItem?.ToString()??"목록";prefs.UiScale=int.Parse((size.SelectedItem?.ToString()??"100%").TrimEnd('%'));prefs.ReplaceAltTab=replace.Checked;prefs.GroupApps=grouped.Checked;prefs.ShowPreview=preview.Checked;prefs.CurrentMonitorOnly=monitor.Checked;prefs.OnPrimaryMonitor=primary.Checked;prefs.ColorPreset=palette.Id;prefs.LightTheme=palette.Light;prefs.HighlightTarget=highlight.Checked;prefs.EmphasizeTarget=emphasis.Checked;prefs.PeekTarget=peek.Checked;prefs.Excluded=Preferences.NormalizeApps(excluded.Text.Split(new[]{'\r','\n',','},StringSplitOptions.RemoveEmptyEntries));prefs.Pinned=apps.CheckedItems.Cast<AppOption>().OrderBy(x=>x.Name,AppNameComparer.Instance).Select(x=>x.Process).ToList();}
+    private void ApplyValues()=>ApplyValues(prefs);
+    private void ApplyValues(Preferences target){
+        target.SortAlphabetically=alphabetical.Checked;
+        target.PrioritizePinned=pinnedFirst.Checked;
+        target.StartWithWindows=startup.Checked;
+        target.ElevatedStartup=startup.Checked&&elevatedStartup.Checked;
+        target.View=mode.SelectedItem?.ToString()??"목록";
+        target.UiScale=int.Parse((size.SelectedItem?.ToString()??"100%").TrimEnd('%'));
+        target.ReplaceAltTab=replace.Checked;
+        target.GroupApps=grouped.Checked;
+        target.ShowPreview=preview.Checked;
+        target.CurrentMonitorOnly=monitor.Checked;
+        target.OnPrimaryMonitor=primary.Checked;
+        target.ColorPreset=palette.Id;target.LightTheme=palette.Light;
+        target.HighlightTarget=highlight.Checked;target.EmphasizeTarget=emphasis.Checked;target.PeekTarget=peek.Checked;
+        target.Excluded=Preferences.NormalizeApps(excluded.Text.Split(new[]{'\r','\n',','},StringSplitOptions.RemoveEmptyEntries));
+        target.Pinned=apps.CheckedItems.Cast<AppOption>().OrderBy(x=>x.Name,AppNameComparer.Instance).Select(x=>x.Process).ToList();
+    }
     internal void TestPage(int page,ThemePalette? p=null){if(p!=null){palette=p;ApplyColors();}SelectPage(page);}
     internal void TestApplyValues()=>ApplyValues();
     internal Task TestLoadIcons()=>LoadIcons(choices.ToArray());

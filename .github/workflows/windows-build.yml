@@ -54,11 +54,11 @@ jobs:
       - name: Upload basic navigation test report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.16-navigation-self-test
+          name: AltTabFlow-v1.1.17-navigation-self-test
           path: artifacts/ci-tests/self-test.json
           if-no-files-found: error
           retention-days: 30
-      - name: Validate fullscreen MapleStory overlay and preview layout UI tests (106 cases)
+      - name: Validate fullscreen MapleStory overlay and preview layout UI tests (133 cases)
         shell: pwsh
         run: |
           $exe = Join-Path (Get-Location) 'artifacts\ci-publish\AltTabFlow.exe'
@@ -68,17 +68,17 @@ jobs:
           $report = Get-Content -LiteralPath $file -Raw | ConvertFrom-Json
           $passed = @($report.tests | Where-Object { $_.PSObject.Properties.Name -contains 'passed' -and $_.passed }).Count
           Write-Host "UI tests passed=$passed; failures=$($report.failures); DPI=$($report.dpi)"
-          if ($test.ExitCode -ne 0 -or $report.failures -ne 0 -or $passed -ne 106) { throw 'UI regression failed or count mismatch (expected 106)' }
+          if ($test.ExitCode -ne 0 -or $report.failures -ne 0 -or $passed -ne 133) { throw 'UI regression failed or count mismatch (expected 133)' }
           New-Item -ItemType Directory -Force 'artifacts\ci-tests' | Out-Null
           Copy-Item -LiteralPath $file -Destination 'artifacts\ci-tests\ui-test.json'
       - name: Upload UI test report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.16-UI-self-test
+          name: AltTabFlow-v1.1.17-UI-self-test
           path: artifacts/ci-tests/ui-test.json
           if-no-files-found: error
           retention-days: 30
-      - name: Validate public release updater and package self-tests (22 cases)
+      - name: Validate public release updater and package self-tests (30 cases)
         shell: pwsh
         run: |
           $exe = Join-Path (Get-Location) 'artifacts\ci-publish\AltTabFlow.exe'
@@ -87,7 +87,7 @@ jobs:
           if (!(Test-Path $file)) { throw 'Missing updater self-test report' }
           $report = Get-Content $file -Raw | ConvertFrom-Json
           $passed = @($report.tests | Where-Object {$_.passed}).Count
-          if ($test.ExitCode -ne 0 -or $report.failures -ne 0 -or $passed -ne 22) {
+          if ($test.ExitCode -ne 0 -or $report.failures -ne 0 -or $passed -ne 30) {
             throw "Updater tests failed: passed=$passed failures=$($report.failures)"
           }
           New-Item -ItemType Directory -Force 'artifacts\ci-tests' | Out-Null
@@ -95,7 +95,7 @@ jobs:
       - name: Upload updater self-test report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.16-updater-self-test
+          name: AltTabFlow-v1.1.17-updater-self-test
           path: artifacts/ci-tests/updater-test.json
           if-no-files-found: error
           retention-days: 30
@@ -116,8 +116,30 @@ jobs:
       - name: Upload elevated startup report
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.16-startup-self-test
+          name: AltTabFlow-v1.1.17-startup-self-test
           path: artifacts/ci-tests/startup-test.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Validate isolated session diagnostics and settings persistence (52 cases)
+        shell: pwsh
+        run: |
+          $exe = Join-Path (Get-Location) 'artifacts\ci-publish\AltTabFlow.exe'
+          $test = Start-Process -FilePath $exe -ArgumentList '--diagnostics-self-test' -Wait -PassThru -WindowStyle Hidden
+          $file = Join-Path $env:LOCALAPPDATA 'AltTabFlow\diagnostics-test.json'
+          if (-not (Test-Path -LiteralPath $file)) { throw 'Missing diagnostics self-test report' }
+          $report = Get-Content -LiteralPath $file -Raw | ConvertFrom-Json
+          $passed = @($report.tests | Where-Object {$_.passed}).Count
+          Write-Host "Diagnostics and settings recovery passed=$passed; failures=$($report.failures)"
+          if ($test.ExitCode -ne 0 -or $report.failures -ne 0 -or $passed -ne 52) {
+            throw "Diagnostics failed or unexpected count (expected 52): passed=$passed failures=$($report.failures)"
+          }
+          New-Item -ItemType Directory -Force -Path 'artifacts\ci-tests' | Out-Null
+          Copy-Item -LiteralPath $file -Destination 'artifacts\ci-tests\diagnostics-test.json'
+      - name: Upload diagnostics and settings recovery report
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltTabFlow-v1.1.17-diagnostics-self-test
+          path: artifacts/ci-tests/diagnostics-test.json
           if-no-files-found: error
           retention-days: 30
       - name: Capture actual UI preview on Windows runner
@@ -133,10 +155,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AltTabFlow-actual-Windows-preview
-          path: artifacts/ui-preview/AltTabFlow-1.1.16-actual.png
+          path: artifacts/ui-preview/AltTabFlow-1.1.17-actual.png
           if-no-files-found: error
           retention-days: 30
-      - name: Capture actual 1.1.16 settings UI
+      - name: Capture actual 1.1.17 settings UI
         id: settings-screenshot
         shell: pwsh
         continue-on-error: true
@@ -145,8 +167,8 @@ jobs:
         if: steps.settings-screenshot.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.16-settings-actual-Windows
-          path: artifacts/ui-preview/AltTabFlow-1.1.16-settings-actual.png
+          name: AltTabFlow-v1.1.17-settings-actual-Windows
+          path: artifacts/ui-preview/AltTabFlow-1.1.17-settings-actual.png
           if-no-files-found: error
           retention-days: 30
       - name: Capture actual persistent updater dialog
@@ -158,8 +180,8 @@ jobs:
         if: steps.updater-screenshot.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: AltTabFlow-v1.1.16-updater-dialog-Windows
-          path: artifacts/ui-preview/AltTabFlow-1.1.16-update-dialog.png
+          name: AltTabFlow-v1.1.17-updater-dialog-Windows
+          path: artifacts/ui-preview/AltTabFlow-1.1.17-update-dialog.png
           if-no-files-found: error
           retention-days: 30
       - name: Stage a SINGLE folder executable with its game compatibility scripts
@@ -173,7 +195,7 @@ jobs:
           $exe = Get-Item 'artifacts\package\AltTabFlow\AltTabFlow.exe'
           $version = $exe.VersionInfo.ProductVersion
           Write-Host "Candidate product version: $version"
-          if ($version -notmatch '^1\.1\.16(?:[.+]|$)') { throw "Expected version 1.1.16, got $version" }
+          if ($version -notmatch '^1\.1\.17(?:[.+]|$)') { throw "Expected version 1.1.17, got $version" }
           foreach ($name in @('AltTabFlow.exe','Run-GameCompat.ps1','Game-compat-mode.cmd')) {
             if (!(Test-Path (Join-Path 'artifacts\package\AltTabFlow' $name))) { throw "Missing $name" }
           }
