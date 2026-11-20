@@ -2,7 +2,9 @@
 
 ## 1.1.17 회사 완전명세 누락 기능 검증
 
-- [ ] Windows CI 기본 키/입력 314/314, UI 133/133(기존106 + X/묶음/키·마우스 해제 순서27), public updater22/22, 관리자 시작11/11, diagnostics+settings 52/52 = **532/532**.
+- [ ] 공개 GitHub 업데이트 설치 트랜잭션: EXE·sidecar 원본 백업, 신규 파일만 역순 삭제, 기존 파일 복원, 사용자 무관 파일 보존, 성공 후 PID/버전/훅 확인; 실패시 새 프로세스를 강제 종료하지 않음. 임시 독립 폴더 8개 회귀 추가.
+
+- [ ] Windows CI 기본 키/입력 314/314, UI 133/133(기존106 + X/묶음/키·마우스 해제 순서27), public updater30/22, 관리자 시작11/11, diagnostics+settings 52/52 = **540/540**.
 - [ ] `--diagnostics-self-test` 독립 프로세스에서 clean·실제 강제 종료·unhandled exception, 전용 critical marker, 4개 회전 로그, 저장 실패 시 bounded 큐, IPC 비응답 클라이언트 해제, 단계별 정리 후속 수행, 설정 원본/lastgood/bak 복구·커밋 무손실 검사.
 - [ ] 버튼 ×/묶음 폭·간격과 정상 WM_CLOSE PID 체크(허위 HWND에는 메시지 전송 금지). 앱 자체 저장 확인/취소는 Windows 실제 앱에서 별도 확인.
 - [ ] 묶음 마우스 클릭 뒤 키가 먼저 해제되면 클릭 해제 후 Commit, 마우스가 먼저 풀리면 다음 마지막 키 해제 Commit. 영역 밖 release, pinned 유지 및 반복 입력.
@@ -21,7 +23,7 @@
 
 ## 1.1.15 회사 1.1.9·1.1.10 동시 반영 검증
 
-- [ ] Windows CI `--self-test` **286/286** (기존206 + Excel HWND/MRU 40 + 정렬38 + 독립 HWND 불변조건 추가2), `--ui-self-test` **106/106** (기존99 + 정렬 저장/취소7), updater22/22, startup11/11 = **425/425**.
+- [ ] Windows CI `--self-test` **286/286** (기존206 + Excel HWND/MRU 40 + 정렬38 + 독립 HWND 불변조건 추가2), `--ui-self-test` **106/106** (기존99 + 정렬 저장/취소7), updater30/22, startup11/11 = **425/425**.
 - [ ] 묶기 켬/끔 Excel A↔B, Excel만 열린 경우, Excel B 대신 Chrome이 직전인 경우, 역방향, Ctrl+Alt+Tab 고정, owner/popup 제외, 동일 앱 Chrome 다중 창.
 - [ ] 그룹 제목·미리보기·FX·실제 Commit 대상이 모두 같은 HWND; Rebuild(true)·그룹 Enter/Backspace·닫힌 문서/검색/숨김/모니터 필터.
 - [ ] 정렬 4조합: MRU+등록 우선 OFF(기본), 이름순만, 등록 우선만, 둘 다. 이전 settings.json 두 새 속성 누락 시 false 기본·등록/숨김/테마 보존. 체크만 바꾼 취소와 저장 동작.
@@ -34,7 +36,7 @@
 
 ## v1.1.14 빠른 입력 회귀 검사
 
-- [ ] Windows CI: 기존 키 입력 206/206 + UI 99/99(기존96 + 연타 정책 3) + 업데이터22/22 + 관리자 시작11/11 = **338/338**.
+- [ ] Windows CI: 기존 키 입력 206/206 + UI 99/99(기존96 + 연타 정책 3) + 업데이터30/22 + 관리자 시작11/11 = **338/338**.
 - [ ] 코드: UI 메시지 1회 48명령/8ms 양보, FIFO·QuickGesture 순서 유지, `CommitFinished` 재진입 시 남은 명령 예약, chooser foreground 중복 활성화 억제.
 - [ ] 실기기: 메이플 Alt+Enter 후 10·30회 고속 Alt+Tab, 후속 입력 먹통·UI 잔류 없는지, Chrome/탐색기 일반 전환·Ctrl+Alt+Tab 고정·ESC 취소·휠·DWM 썸네일 보존.
 - [ ] CI와 실제 DXGI 독점 전체화면, 관리자 게임 권한, UAC, 자동 업데이트 EXE 교체 검증을 구분.
@@ -137,7 +139,7 @@ dotnet build .\AltTabFlow.csproj -c Release
 
 ## 1.1.11 GitHub PR #9 CI 증거 및 미완료 사항
 
-[Windows CI #42842347985](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) **성공**: SHA-256 무결성, Windows .NET 8 컴파일, self-contained EXE 게시, 기본206/206, UI85/85, 공개 업데이트22/22, 관리자 로그인 시작11/11 = 총 **324/324개**. Windows 실제 전환기/설정/업데이트 창 캡처와 EXE+게임 스크립트 동일 폴더 실행 후보 ZIP 업로드 성공. [PR #9 main 병합](https://github.com/hossea123456789-design/AltTabFlow/pull/9).
+[Windows CI #42842347985](https://github.com/hossea123456789-design/AltTabFlow/actions/runs/42842347985) **성공**: SHA-256 무결성, Windows .NET 8 컴파일, self-contained EXE 게시, 기본206/206, UI85/85, 공개 업데이트30/22, 관리자 로그인 시작11/11 = 총 **324/324개**. Windows 실제 전환기/설정/업데이트 창 캡처와 EXE+게임 스크립트 동일 폴더 실행 후보 ZIP 업로드 성공. [PR #9 main 병합](https://github.com/hossea123456789-design/AltTabFlow/pull/9).
 
 **아직 미완료:** 공개 다운로드 전용 GitHub 저장소 `AltTabFlow-Downloads` 생성 및 게시 권한 연결, 첫 공개 `v1.1.11` 프리릴리스 발행, 사용자 PC의 Alt+Enter 메이플 게임 포커스 실측, 공개 릴리스 익명 다운로드/실제 EXE 교체·재실행 검증. 공개 배포 기능이 원클릭으로 실제 작동한다고 주장하지 않음.
 
@@ -161,7 +163,7 @@ dotnet build .\AltTabFlow.csproj -c Release
 
 ## 1.1.13 실사용 회귀 체크
 
-- [ ] CI 기본206/206 · UI96/96 · updater22/22 · 관리자 로그인11/11 = **335/335**
+- [ ] CI 기본206/206 · UI96/96 · updater30/22 · 관리자 로그인11/11 = **335/335**
 - [ ] 실제 Alt+Enter로 확대된 MapleStory 화면에서 **메이플 항목을 선택으로 거친 뒤** Alt 유지 + Tab 연속 2~5회 동안 AltTabFlow 화면이 사라지지 않음
 - [ ] 전환기 내부 MapleStory **DWM 썸네일** 유지, 게임 HWND를 미리보기 효과로 임시 topmost 승격하지 않음
 - [ ] 다른 앱의 기존 Peek/Dim/Aura 유지 및 전환 대상 선택에 의한 실제 전경 창 활성화 확인
